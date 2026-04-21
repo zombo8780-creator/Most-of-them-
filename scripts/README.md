@@ -1,5 +1,27 @@
 # Scripts
 
+## `snapshot_models.py`
+
+Pulls the live Venice model catalog and writes compact JSON snapshots to
+`skills/venice-models/snapshots/` (one file per model type, plus
+`model_ids.txt` with every API model ID). Useful for:
+
+- Verifying the `apiModelId` values used in skill examples still exist.
+- Diffing the catalog between releases — commit the snapshot to see what
+  shipped / was deprecated.
+
+```bash
+export VENICE_API_KEY=sk-...
+python scripts/snapshot_models.py
+# or a single type
+python scripts/snapshot_models.py --type text
+```
+
+No third-party dependencies.
+
+---
+
+
 ## `sync_from_swagger.py`
 
 Diffs the Venice OpenAPI spec against the skills in this repo and flags drift.

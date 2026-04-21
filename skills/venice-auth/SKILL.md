@@ -70,9 +70,10 @@ Where the decoded JSON is:
 | `address` | the wallet's checksummed address |
 | `statement` | `"Sign in to Venice API"` |
 | `nonce` | random 16-char hex, single-use |
-| `issuedAt` / `expirationTime` | ISO-8601, recommended TTL **10 minutes** |
+| `issuedAt` / `expirationTime` | ISO-8601. Server enforces a hard **5-minute** window from `issuedAt`. |
+| `chainId` | `8453` — accepted as number (`8453`), numeric string (`"8453"`), or CAIP-2 (`"eip155:8453"`). |
 
-The header is short-lived — generate a fresh one before every burst of requests (or cache ~8 minutes, leaving safety margin).
+The header is short-lived — generate a fresh one at most every ~4 minutes (server accepts up to 5 min from `issuedAt`). The payload `timestamp` must be within **30 seconds** of the SIWE `issuedAt`, and no more than 30 seconds ahead of server time. Nonces are single-use per wallet — reuse within ~5.5 minutes is rejected.
 
 ### Manual signing (TypeScript)
 
@@ -92,7 +93,7 @@ function makeSiwxHeader() {
     chainId: 8453,
     nonce: crypto.randomUUID().replace(/-/g, '').slice(0, 16),
     issuedAt: new Date().toISOString(),
-    expirationTime: new Date(Date.now() + 10 * 60_000).toISOString(),
+    expirationTime: new Date(Date.now() + 4 * 60_000).toISOString(),
   })
   const message = msg.prepareMessage()
   const signature = wallet.signMessageSync(message)
@@ -167,7 +168,7 @@ Both schemes can co-exist: a Pro user may generate a **Web3 API key** via `POST 
 
 | Status | Likely cause |
 |---|---|
-| `401 Authentication failed` | bad/expired key, SIWE `expirationTime` in the past, wrong `domain`/`uri` fields, chain id != `8453` |
+| `401 Authentication failed` | bad/expired key, SIWE older than 5 min from `issuedAt`, `payload.timestamp` off by >30s, wrong `domain`/`uri` fields, chain id != `8453`, nonce replayed. The server returns a specific code like `X402_SIGN_IN_EXPIRED`, `X402_SIGN_IN_TIMESTAMP_MISMATCH`, `X402_SIGN_IN_DOMAIN_MISMATCH`, `X402_SIGN_IN_NONCE_REUSED` in the error body. |
 | `401 This model is only available to Pro users` | using x402 or an INFERENCE key on a gated model — switch to a Pro Bearer key |
 | `402 PAYMENT_REQUIRED` (x402) | wallet balance too low; read `topUpInstructions` and top up via `/x402/top-up` |
 | `402 INSUFFICIENT_BALANCE` (Bearer) | DIEM + USD + bundled credits are all empty; top up at venice.ai |
@@ -176,5 +177,5 @@ Both schemes can co-exist: a Pro user may generate a **Web3 API key** via `POST 
 
 - Bearer keys behave like passwords — store in a secret manager, rotate on compromise, scope via `consumptionLimits`.
 - SIWE requires a private key signer on the client side. For browsers, use a wallet provider (MetaMask, WalletConnect) — do **not** ship raw private keys.
-- Use `expirationTime` ≤ 10 minutes and rotate nonces. Never reuse a signed `X-Sign-In-With-X` header across hours or across machines.
+- Signed headers are valid **5 minutes** from `issuedAt`; rotate every ~4 minutes. Never reuse a signed `X-Sign-In-With-X` header across hours or across machines. Nonces are tracked per wallet for ~5.5 min; replaying one is rejected with `X402_SIGN_IN_NONCE_REUSED`.
 - Rate limits are per-key (Bearer) or per-wallet (x402). See [`venice-api-keys`](../venice-api-keys/SKILL.md) and [`venice-errors`](../venice-errors/SKILL.md).

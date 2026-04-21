@@ -34,7 +34,7 @@ curl "https://api.venice.ai/api/v1/characters?search=philosopher&sortBy=highestR
 | `search` | string, ≤ 200 | Name, description, or tag match. Hashtag (`#Philosophy`) supported. |
 | `categories` | string[], ≤ 20 | Repeat or comma-separate. Character categories (`roleplay`, `philosophy`, …). |
 | `tags` | string[], ≤ 20 | Repeat or comma-separate. |
-| `modelId` | string[], ≤ 20 | Filter by backing model (`zai-org-glm-5-1`, `kimi-k2-6`, `minimax-m2-5-uncensored`, …). |
+| `modelId` | string[], ≤ 20 | Filter by backing model (`zai-org-glm-5-1`, `kimi-k2-6`, `minimax-m25`, …). |
 | `isAdult` | `"true"` / `"false"` | Adult-content flag. |
 | `isPro` | `"true"` / `"false"` | Require a Pro model. |
 | `isWebEnabled` | `"true"` / `"false"` | Allow web access. |
@@ -122,6 +122,14 @@ You can override the model — Venice will still apply the character's system pr
 ```
 
 Useful when the character's `modelId` lacks a capability (e.g. function calling, vision) that your app needs.
+
+### Via feature suffix on the `model` string
+
+```json
+{ "model": "zai-org-glm-5-1:character_slug=alan-watts", "messages": [...] }
+```
+
+Useful when the client library (OpenAI SDK, LangChain, etc.) can't add `venice_parameters`. See [`venice-chat`](../venice-chat/SKILL.md#model-feature-suffixes) for the full suffix grammar.
 
 ## Patterns
 

@@ -76,7 +76,35 @@ All optional. Combined with model feature suffixes, these are how you enable Ven
 
 ### Model feature suffixes
 
-The swagger notes that some `venice_parameters` (e.g. `strip_thinking_response`) can also be expressed as **model feature suffixes** on the `model` string — useful when the caller/library (OpenAI SDK, LangChain) can't set `venice_parameters`. The exact suffix syntax is documented separately at <https://docs.venice.ai> under "Model Feature Suffix" — consult that page for the live spec rather than guessing.
+Some `venice_parameters` can also be expressed as **model feature suffixes** on the `model` string — useful when the caller/library (OpenAI SDK, LangChain) can't set `venice_parameters`. Syntax:
+
+```
+<model-id>:<key>=<value>[&<key>=<value>…]
+```
+
+Values are URL-decoded. Supported keys (exact match):
+
+| Key | Type | Maps to |
+|---|---|---|
+| `enable_web_search` | `on` / `off` / `auto` | `venice_parameters.enable_web_search` |
+| `enable_web_citations` | `"true"` / `"false"` | `venice_parameters.enable_web_citations` |
+| `enable_web_scraping` | `"true"` / `"false"` | `venice_parameters.enable_web_scraping` |
+| `include_venice_system_prompt` | `"true"` / `"false"` | `venice_parameters.include_venice_system_prompt` |
+| `include_search_results_in_stream` | `"true"` / `"false"` | `venice_parameters.include_search_results_in_stream` |
+| `return_search_results_as_documents` | `"true"` / `"false"` | `venice_parameters.return_search_results_as_documents` |
+| `character_slug` | string | `venice_parameters.character_slug` |
+| `strip_thinking_response` | `"true"` / `"false"` | `venice_parameters.strip_thinking_response` |
+| `disable_thinking` | `"true"` / `"false"` | `venice_parameters.disable_thinking` |
+
+Unknown keys are silently ignored. Examples:
+
+```
+zai-org-glm-5-1:enable_web_search=on
+kimi-k2-6:strip_thinking_response=true&enable_web_search=auto
+zai-org-glm-5-1:character_slug=alan-watts
+```
+
+Note: `enable_e2ee` and `enable_x_search` can **only** be set via `venice_parameters`, not as suffixes.
 
 ## Messages and modalities
 

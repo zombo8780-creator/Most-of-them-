@@ -22,7 +22,7 @@ All three are **public** — no auth required — though you can send a Bearer t
 - You need to pick a model at runtime based on capabilities (vision, reasoning, function calling, E2EE, X search, multi-image, …).
 - You need to validate a request against a model's `constraints` (prompt length, aspect ratio, resolution, steps).
 - You need the current **price per million tokens / per image / per second / per 1k chars** to build a cost estimate.
-- You want to resolve a user-friendly trait name (e.g. `default-image`) or a frontier-style ID (`gpt-5-4-pro`, `claude-opus-4-7`) to a concrete Venice model ID.
+- You want to resolve a user-friendly trait name (e.g. `default-image`) or a frontier-style ID (`openai-gpt-54-pro`, `claude-opus-4-7`) to a concrete Venice model ID.
 
 ## `GET /models`
 
@@ -116,7 +116,7 @@ Crypto RPC pricing is **not** in `/models` — it's tier × chain multipliers on
 curl "https://api.venice.ai/api/v1/models/traits?type=text"
 ```
 
-Returns `{ object: "list", type: "text", data: { "default": "zai-org-glm-5-1", "fastest": "kimi-k2-6-mini", "most_uncensored": "minimax-m2-5-uncensored", ...} }`.
+Returns `{ object: "list", type: "text", data: { "default": "zai-org-glm-5-1", "fastest": "grok-41-fast", "most_uncensored": "venice-uncensored", ...} }`.
 
 Use this to avoid hard-coding model IDs — resolve a trait at boot and cache for the session.
 
@@ -126,7 +126,7 @@ Use this to avoid hard-coding model IDs — resolve a trait at boot and cache fo
 curl "https://api.venice.ai/api/v1/models/compatibility_mapping?type=text"
 ```
 
-Returns `{ object: "list", data: { "gpt-5-4-pro": "zai-org-glm-5-1", "claude-opus-4-7": "kimi-k2-6", ... } }`.
+Returns `{ object: "list", data: { "openai-gpt-54-pro": "zai-org-glm-5-1", "claude-opus-4-7": "claude-opus-4-7", "gpt-5-4-pro": "openai-gpt-54-pro", ... } }`. Both OpenAI-style IDs (`openai-gpt-54-pro`) and vendor-style aliases (`gpt-5-4-pro`) may appear as keys.
 
 Lets an OpenAI-style client call Venice with its native model IDs — Venice substitutes behind the scenes. Useful when porting existing code.
 
@@ -179,4 +179,4 @@ For extended-context runs, check if `inputTokens > p.extended?.context_token_thr
 - `offline: true` means the model exists in the catalog but can't currently serve requests — treat it as absent for scheduling.
 - `model_spec.pricing` can be **missing** on free / internal models — guard against `undefined`.
 - `traits` differ by `type` — there's no "global default"; always pass `?type=...`.
-- `compatibility_mapping` resolves model IDs, not capabilities. If your caller sends `gpt-5-4-pro` but needs vision, verify via the resolved Venice model's `capabilities.supportsVision`.
+- `compatibility_mapping` resolves model IDs, not capabilities. If your caller sends `openai-gpt-54-pro` but needs vision, verify via the resolved Venice model's `capabilities.supportsVision`.

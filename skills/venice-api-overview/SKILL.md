@@ -122,7 +122,7 @@ or, for 400 validation errors:
 - Venice-only extensions live under:
   - `venice_parameters` (chat completions)
   - `venice_parameters` is **rejected** on `/responses` — use headers / native fields instead
-- Model feature suffixes (e.g. `zai-org-glm-5-1:web_search=on`) flip Venice parameters via the model ID.
+- Model feature suffixes (e.g. `zai-org-glm-5-1:enable_web_search=on`, `kimi-k2-6:strip_thinking_response=true&disable_thinking=true`) flip `venice_parameters` via the model ID — see [`venice-chat`](../venice-chat/SKILL.md#model-feature-suffixes).
 
 ## Versioning
 
