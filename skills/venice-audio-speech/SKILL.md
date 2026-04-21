@@ -23,8 +23,8 @@ curl https://api.venice.ai/api/v1/audio/speech \
   -H "Authorization: Bearer $VENICE_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "tts-kokoro",
-    "voice": "af_sky",
+    "model": "tts-xai-v1",
+    "voice": "eve",
     "input": "Hello, welcome to Venice Voice.",
     "response_format": "mp3",
     "speed": 1.0,
@@ -39,8 +39,8 @@ Response is the raw audio (`Content-Type` matches `response_format`).
 | Field | Type | Default | Notes |
 |---|---|---|---|
 | `input` | string | — | **Required.** Up to **4096** characters. |
-| `model` | enum | `tts-kokoro` | See model list below. |
-| `voice` | enum | `af_sky` | **Voice is model-specific** — wrong combo = `400`. See voice families. |
+| `model` | enum | `tts-xai-v1` | See model list below. |
+| `voice` | enum | model-specific (e.g. `eve` for `tts-xai-v1`) | **Voice is model-specific** — wrong combo = `400`. See voice families. |
 | `response_format` | `mp3` / `opus` / `aac` / `flac` / `wav` / `pcm` | `mp3` | `pcm` returns 24 kHz signed-16 LE for pipelines. |
 | `speed` | number | `1.0` | Range `0.25–4.0`. |
 | `streaming` | bool | `false` | `true` → streamed sentence-by-sentence as audio continues to generate. |
@@ -53,9 +53,9 @@ Response is the raw audio (`Content-Type` matches `response_format`).
 
 | Model ID | Family | Highlights |
 |---|---|---|
-| `tts-kokoro` | Kokoro | Default. Multilingual, many voices across languages. |
+| `tts-xai-v1` | xAI | **Default.** Conversational style, ISO 639-1 language hints. |
+| `tts-kokoro` | Kokoro | Multilingual, many voices across languages. |
 | `tts-qwen3-0-6b` / `tts-qwen3-1-7b` | Qwen 3 | Emotion control via `prompt`, temperature, top_p. |
-| `tts-xai-v1` | xAI | Conversational style, ISO 639-1 language hints. |
 | `tts-inworld-1-5-max` | Inworld | Character-driven voices (Craig, Ashley, …). |
 | `tts-chatterbox-hd` | Chatterbox | HD voices (Aurora, Blade, …), temperature. |
 | `tts-orpheus` | Orpheus | Conversational (tara, leah, jess, leo, …), temperature. |
@@ -63,7 +63,7 @@ Response is the raw audio (`Content-Type` matches `response_format`).
 | `tts-minimax-speech-02-hd` | MiniMax | WiseWoman, DeepVoiceMan, … |
 | `tts-gemini-3-1-flash` | Gemini Flash | Star-named voices (Achernar, Achird, Zephyr, …). |
 
-Always inspect `GET /models/{id}` for the authoritative voice list, `supportsPromptParam`, `supportsTemperatureParam`, `supportsTopPParam` capabilities.
+Always inspect the entry for your model in `GET /models?type=tts` — `modelSpec` exposes the authoritative voice list plus `supportsPromptParam`, `supportsTemperatureParam`, `supportsTopPParam`.
 
 ## Voice families (by prefix)
 
@@ -88,8 +88,8 @@ Pass a voice that isn't in the chosen model's list and you get `400`.
 
 ```json
 {
-  "model": "tts-kokoro",
-  "voice": "af_sky",
+  "model": "tts-xai-v1",
+  "voice": "eve",
   "input": "Hello, this is a long document to narrate. ...",
   "streaming": true,
   "response_format": "mp3"
@@ -110,8 +110,8 @@ const client = new OpenAI({
 })
 
 const mp3 = await client.audio.speech.create({
-  model: 'tts-kokoro',
-  voice: 'af_sky',
+  model: 'tts-xai-v1',
+  voice: 'eve',
   input: 'Hello from Venice.',
   response_format: 'mp3',
 })
@@ -150,4 +150,4 @@ For other families, emotion comes from the **voice choice itself** (e.g. Inworld
 - `input` hard cap is 4096 chars. For books / long content, split on sentence boundaries and concatenate audio client-side.
 - `streaming: true` + SDKs: some OpenAI SDK versions don't expose streaming for `audio.speech.create`; call the REST endpoint directly and consume the HTTP body.
 - `speed` compounds with model internal speech rate — extreme values (`0.25`, `4.0`) often sound unnatural; keep within `0.8–1.3` for narration.
-- Voice names are case-sensitive (`af_sky` ≠ `AF_SKY`).
+- Voice names are case-sensitive (`eve` ≠ `EVE`, `af_sky` ≠ `AF_SKY`).

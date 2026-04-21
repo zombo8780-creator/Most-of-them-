@@ -141,7 +141,7 @@ Returns for the calling key:
     "nextEpochBegins": "2025-05-07T00:00:00.000Z",
     "rateLimits": [
       {
-        "apiModelId": "zai-org-glm-4.7",
+        "apiModelId": "zai-org-glm-5-1",
         "rateLimits": [
           { "type": "RPM", "amount": 100 },
           { "type": "TPM", "amount": 200000 },
@@ -167,7 +167,7 @@ Returns the last 50 rate-limit breaches:
 {
   "object": "list",
   "data": [
-    { "apiKeyId": "...", "modelId": "zai-org-glm-4.7", "rateLimitType": "RPM",
+    { "apiKeyId": "...", "modelId": "zai-org-glm-5-1", "rateLimitType": "RPM",
       "rateLimitTier": "paid", "timestamp": "2026-04-20T12:34:56Z" }
   ]
 }

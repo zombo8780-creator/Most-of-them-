@@ -42,7 +42,7 @@ curl https://api.venice.ai/api/v1/image/edit \
 
 | Field | Notes |
 |---|---|
-| `model` | Default `qwen-edit`. See `GET /models?type=INPAINT` / edit-capable models. `modelId` is deprecated — prefer `model`. |
+| `model` | Default `qwen-edit`. See `GET /models?type=inpaint` for edit-capable models. `modelId` is deprecated — prefer `model`. |
 | `prompt` | Required, ≤ 32 768 chars (usually 1500 is plenty). Short & specific works best. |
 | `image` | Required. Base64 string, file upload, or `https://` URL. |
 | `aspect_ratio` | Optional: `auto`, `1:1`, `3:2`, `16:9`, `21:9`, `9:16`, `2:3`, `3:4`, `4:5`. Supported values vary per model — check `constraints` on `GET /models`. |
@@ -165,7 +165,7 @@ Send **either** `image` (base64 / file) **or** `image_url`. Response is `image/p
 
 ## Gotchas
 
-- Base64 strings must **not** include the `data:image/...;base64,` prefix for `image` in `/image/edit` and `/image/upscale`. The prefix IS accepted by `/image/multi-edit`'s `images[]` entries, which explicitly allow `data:` URLs.
+- `/image/multi-edit` `images[]` explicitly accepts `data:image/...;base64,...` URLs or plain base64. For `/image/edit` and `/image/upscale`, send base64 as a plain string unless the docs say otherwise — if your client adds a `data:` prefix and you get a `400`, strip it.
 - For multipart `/image/multi-edit`, the field name is `images` and you send **multiple parts with the same field name** — order matters (base first).
 - `modelId` is deprecated everywhere — use `model`.
 - `/image/upscale` with `scale=4` on a large input is silently clamped to stay under 16 MP.

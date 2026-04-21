@@ -158,7 +158,7 @@ curl "https://api.venice.ai/api/v1/x402/transactions/0xYOUR_WALLET?limit=50&offs
         "type": "CHARGE",
         "createdAt": "2026-04-03T12:34:56.000Z",
         "requestId": "chatcmpl-...",
-        "modelId": "llama-3.3-70b"
+        "modelId": "zai-org-glm-5-1"
       },
       {
         "id": "ledger_01H...",

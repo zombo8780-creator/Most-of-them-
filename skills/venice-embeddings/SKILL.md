@@ -13,7 +13,7 @@ description: Call POST /embeddings on Venice. Covers request shape (input, model
 - You need text clustering, classification, deduplication, or reranking.
 - You want Venice's E2EE / private inference property on vectors.
 
-Text-only. For image embeddings use a multimodal chat model to produce a structured representation, or query `GET /models?type=IMAGE` for models that expose embedding outputs.
+Text-only. For image/multimodal signals, either run images through a vision chat model and embed the description, or pick a multimodal-capable embedding model from `GET /models?type=embedding` (the catalog changes; inspect `modelSpec` on each row).
 
 ## Minimal request
 
@@ -43,13 +43,13 @@ curl https://api.venice.ai/api/v1/embeddings \
 
 | Field | Type | Notes |
 |---|---|---|
-| `model` | string | **Required.** Model ID from `GET /models?type=EMBEDDING`. |
-| `input` | string \| string[] \| number[] \| number[][] | **Required.** Single string, array of strings, or pre-tokenized arrays. |
+| `model` | string | **Required.** Model ID from `GET /models?type=embedding`. |
+| `input` | string \| string[] \| number[] \| number[][] | **Required.** Single string, array of strings (≤ 2048 entries), or pre-tokenized arrays. |
 | `encoding_format` | `"float"` \| `"base64"` | Default `"float"`. Use `"base64"` for ~4× payload shrinkage; decode client-side. |
-| `dimensions` | integer | Optional. Truncate output to N dimensions (only supported by some models — check the model's `modelSpec`). |
+| `dimensions` | integer | Optional. Truncate output dimensions. Only honored when `modelSpec.supportsCustomDimensions === true`. |
 | `user` | string | Accepted for OpenAI compat. Discarded by Venice. |
 
-`input` max length depends on the model's context window (often 512–8192 tokens). For arrays, Venice returns one embedding per element, in order, with matching `index`.
+`input` max tokens per string is capped at the model's `modelSpec.maxInputTokens` (typically 8192). Batch arrays are capped at **2048 items**. Venice returns one embedding per element, in order, with matching `index`.
 
 ## Response headers & compression
 
@@ -98,10 +98,14 @@ async function embedBatch(texts: string[], batchSize = 64) {
 
 ## Choosing a model
 
-Query `GET /models?type=EMBEDDING` for the current catalog (IDs, dimensions, context length, pricing per input token). Common choices:
+Query `GET /models?type=embedding` for the current catalog. Each entry exposes:
 
-- **`text-embedding-bge-m3`** — strong multilingual, 1024-dim.
-- Any model with `modelSpec.capabilities.supportsEmbeddings === true`.
+- `modelSpec.embeddingDimensions` — native output dimension (e.g. 1024 for BGE-M3).
+- `modelSpec.maxInputTokens` — max tokens per input string.
+- `modelSpec.supportsCustomDimensions` — whether `dimensions` can truncate the output.
+- `modelSpec.pricing.input.usd` / `.diem` — cost per **million** input tokens.
+
+Built-in options include `text-embedding-bge-m3`, `text-embedding-bge-en-icl`, `text-embedding-qwen3-8b`, `text-embedding-qwen3-0-6b`, `text-embedding-multilingual-e5-large-instruct`, `text-embedding-3-small`, `text-embedding-3-large`, `gemini-embedding-2-preview`, `text-embedding-nemotron-embed-vl-1b-v2`.
 
 Always pin the model ID — cosine distances are **not** comparable across different embedding models.
 
@@ -119,7 +123,7 @@ Always pin the model ID — cosine distances are **not** comparable across diffe
 
 ## Gotchas
 
-- `dimensions` is not universally supported — check the model's `modelSpec.constraints.embeddingDimensions` first.
+- `dimensions` only works when `modelSpec.supportsCustomDimensions === true`; otherwise Venice ignores it or returns `400`.
 - `input` must not be empty; Venice rejects empty strings with `400`.
-- Cosine similarity assumes L2-normalized vectors. Many Venice embedding models return **already-normalized** vectors — verify with `Math.hypot(...v) ≈ 1` before re-normalizing.
+- Whether the returned vectors are L2-normalized depends on the model — verify with `Math.hypot(...v) ≈ 1` before assuming.
 - For RAG, store `model` alongside the vector so you can re-embed on upgrade.

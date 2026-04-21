@@ -79,7 +79,7 @@ curl "https://api.venice.ai/api/v1/billing/usage?limit=200&page=1&sortOrder=desc
   "data": [
     {
       "timestamp": "2026-04-20T12:34:56Z",
-      "sku": "llama-3.3-70b-llm-output-mtoken",
+      "sku": "zai-org-glm-5-1-llm-output-mtoken",
       "units": 0.000227,
       "pricePerUnitUsd": 2.8,
       "amount": -0.06356,
@@ -129,7 +129,7 @@ curl "https://api.venice.ai/api/v1/billing/usage-analytics?lookback=7d" \
   "byDate": [{ "date": "2026-04-20", "USD": 0.5, "DIEM": 10.25 }, ...],
   "byModel": [
     {
-      "modelName": "Llama 3.3 70B",
+      "modelName": "GLM 5.1",
       "unitType": "tokens",
       "modelType": "LLM",
       "totalUsd": 0.4,
@@ -142,9 +142,9 @@ curl "https://api.venice.ai/api/v1/billing/usage-analytics?lookback=7d" \
     }
   ],
   "byModelDaily": [
-    { "date": 1705276800000, "Llama 3.3 70B": 5.5, "Claude 3.5 Sonnet": 3.2 }
+    { "date": 1705276800000, "GLM 5.1": 5.5, "Claude Opus 4.7": 3.2 }
   ],
-  "topModels": ["Llama 3.3 70B", "Claude 3.5 Sonnet"],
+  "topModels": ["GLM 5.1", "Claude Opus 4.7"],
   "byKey": [
     { "apiKeyId": "key_abc123", "description": "Production Key",
       "totalUsd": 0.8, "totalDiem": 15, "totalUnits": 75000 },

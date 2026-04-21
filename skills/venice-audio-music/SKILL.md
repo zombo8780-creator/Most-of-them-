@@ -159,14 +159,14 @@ async function generateTrack() {
 
 ## Capability probing
 
-Before calling `/audio/queue`, `GET /models/{model}` returns (among other fields):
+Before calling `/audio/queue`, inspect the model entry returned by `GET /models?type=music` — each row's `modelSpec` exposes (among other fields):
 
 - `supports_lyrics`, `lyrics_required`, `supports_lyrics_optimizer`
 - `supports_force_instrumental`, `supports_speed`, `supports_language_code`
 - `voices[]`, `default_voice`
 - `min_prompt_length`, `prompt_character_limit`
 - `min_speed`, `max_speed`
-- `pricing.per_second_generated` or `pricing.per_thousand_characters`
+- `pricing.generation`, `pricing.per_second`, or `pricing.per_thousand_characters` (depending on the model family)
 
 ## Errors
 

@@ -87,7 +87,7 @@ curl https://api.venice.ai/api/v1/video/complete \
 
 ## `QueueVideoRequest` fields
 
-Availability depends on the model — check `GET /models?type=VIDEO`.
+Availability depends on the model — check `GET /models?type=video`.
 
 | Field | Type | Notes |
 |---|---|---|

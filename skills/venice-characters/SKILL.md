@@ -34,7 +34,7 @@ curl "https://api.venice.ai/api/v1/characters?search=philosopher&sortBy=highestR
 | `search` | string, ≤ 200 | Name, description, or tag match. Hashtag (`#Philosophy`) supported. |
 | `categories` | string[], ≤ 20 | Repeat or comma-separate. Character categories (`roleplay`, `philosophy`, …). |
 | `tags` | string[], ≤ 20 | Repeat or comma-separate. |
-| `modelId` | string[], ≤ 20 | Filter by backing model (`llama-3.3-70b`, `venice-uncensored`, …). |
+| `modelId` | string[], ≤ 20 | Filter by backing model (`zai-org-glm-5-1`, `kimi-k2-6`, `minimax-m2-5-uncensored`, …). |
 | `isAdult` | `"true"` / `"false"` | Adult-content flag. |
 | `isPro` | `"true"` / `"false"` | Require a Pro model. |
 | `isWebEnabled` | `"true"` / `"false"` | Allow web access. |
@@ -96,7 +96,7 @@ Also sets `x-pagination-*` response headers (`limit`, `page`, `total`, `total-pa
 
 ```json
 {
-  "model": "llama-3.3-70b",
+  "model": "zai-org-glm-5-1",
   "venice_parameters": { "character_slug": "alan-watts" },
   "messages": [
     { "role": "user", "content": "What's the nature of mind?" }
@@ -112,7 +112,7 @@ You can override the model — Venice will still apply the character's system pr
 
 ```json
 {
-  "model": "zai-org-glm-4.7",
+  "model": "kimi-k2-6",
   "venice_parameters": {
     "character_slug": "alan-watts",
     "include_venice_system_prompt": false
@@ -122,12 +122,6 @@ You can override the model — Venice will still apply the character's system pr
 ```
 
 Useful when the character's `modelId` lacks a capability (e.g. function calling, vision) that your app needs.
-
-### Via feature suffix
-
-```json
-{ "model": "llama-3.3-70b:character_slug=alan-watts", "messages": [...] }
-```
 
 ## Patterns
 

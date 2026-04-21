@@ -22,7 +22,7 @@ All three are **public** — no auth required — though you can send a Bearer t
 - You need to pick a model at runtime based on capabilities (vision, reasoning, function calling, E2EE, X search, multi-image, …).
 - You need to validate a request against a model's `constraints` (prompt length, aspect ratio, resolution, steps).
 - You need the current **price per million tokens / per image / per second / per 1k chars** to build a cost estimate.
-- You want to resolve a user-friendly trait name (e.g. `default-image`) or an OpenAI-style ID (`gpt-4o-mini`) to a concrete Venice model ID.
+- You want to resolve a user-friendly trait name (e.g. `default-image`) or a frontier-style ID (`gpt-5-4-pro`, `claude-opus-4-7`) to a concrete Venice model ID.
 
 ## `GET /models`
 
@@ -81,20 +81,24 @@ curl "https://api.venice.ai/api/v1/models?type=text"
 ### `model_spec.constraints` — by model family
 
 - **Text** — `temperature.default`, `top_p.default`, and `{frequency,presence,repetition}_penalty.default`.
-- **Image** — `promptCharacterLimit`, `widthHeightDivisor`, `steps.{default,max}`, `aspectRatios[]` + `defaultAspectRatio`, `resolutions[]` + `defaultResolution`.
+- **Image** — `promptCharacterLimit`, `widthHeightDivisor`, `steps.{default,max}`, optional `aspectRatios[]` + `defaultAspectRatio`, optional `resolutions[]` + `defaultResolution` (the last two appear only on models that use ratio/resolution-based sizing).
 - **Video** — `aspect_ratios[]`, `resolutions[]`, `durations[]`, `model_type` (`text-to-video`/`image-to-video`/`video`), `audio`, `audio_configurable`, `prompt_character_limit`.
 - **Inpaint / edit** — `aspectRatios[]`, `promptCharacterLimit`, `combineImages`.
-- **TTS / Music** (returned flat at top level on audio models) — `voices[]`, `default_voice`, `supports_lyrics`, `lyrics_required`, `supports_lyrics_optimizer`, `supports_force_instrumental`, `supports_speed`, `supports_language_code`, `min_speed`, `max_speed`, `min_prompt_length`, `prompt_character_limit`.
+- **TTS / Music** (fields surface at the top level of `model_spec`, not inside `constraints`) — `voices[]`, `default_voice`, `supports_lyrics`, `lyrics_required`, `supports_lyrics_optimizer`, `supports_force_instrumental`, `supports_speed`, `supports_language_code`, `min_speed`, `max_speed`, `min_prompt_length`, `prompt_character_limit`, `supportsPromptParam`, `supportsTemperatureParam`, `supportsTopPParam`.
+- **Embedding** (top-level, not inside `constraints`) — `embeddingDimensions`, `maxInputTokens`, `supportsCustomDimensions`.
 
 ### `model_spec.pricing` — by model family
 
 - **LLM** — `input.{usd,diem}`, `output.{usd,diem}` per 1 000 000 tokens, plus optional `cache_input` (reads), `cache_write` (writes, e.g. Anthropic 1.25×), and `extended.*` tier triggered by `context_token_threshold`.
-- **Image** — `generation.{usd,diem}` per image, sometimes `upscale.{usd,diem}`, `edit.{usd,diem}`, `background_remove.{usd,diem}`.
-- **Video** — per-second or per-megapixel blocks; `/video/quote` is the source of truth for real pricing.
-- **Audio** — `per_second_generated` (music) or `per_thousand_characters` (narration / TTS long-form).
-- **Embedding** — `input.{usd,diem}` per 1 M tokens.
-- **ASR** — `per_second` or `per_thousand_characters`.
-- **Crypto RPC** — `per_request` by method tier (see [`venice-crypto-rpc`](../venice-crypto-rpc/SKILL.md)).
+- **Image** — either `generation.{usd,diem}` per image (flat) or `resolutions.<tier>.{usd,diem}` (per `1K`/`2K`/`4K`). Upscale-capable image models also carry `upscale.{2x,4x}.{usd,diem}`.
+- **Inpaint / edit** — `inpaint.{usd,diem}` per edit.
+- **Video** — per-duration buckets (`durations.<tier>.{usd,diem,min_seconds,max_seconds}`) or per-second-of-input; `/video/quote` is always the source of truth for the actual charge.
+- **Music / long audio** — `generation.{usd,diem}` (per job), `per_second.{usd,diem}` (per second generated), or `per_thousand_characters.{usd,diem}` (character-priced narration).
+- **TTS** — `input.{usd,diem}` per **1 000 000 input characters**.
+- **ASR** — `per_audio_second.{usd,diem}`.
+- **Embeddings** — `input.{usd,diem}` per 1 000 000 tokens.
+
+Crypto RPC pricing is **not** in `/models` — it's tier × chain multipliers on `/crypto/rpc/{network}` (see [`venice-crypto-rpc`](../venice-crypto-rpc/SKILL.md)).
 
 ### Other top-level `model_spec` fields
 
@@ -112,7 +116,7 @@ curl "https://api.venice.ai/api/v1/models?type=text"
 curl "https://api.venice.ai/api/v1/models/traits?type=text"
 ```
 
-Returns `{ object: "list", type: "text", data: { "default": "zai-org-glm-4.7", "fastest": "llama-3.2-3b", "most_uncensored": "...", ...} }`.
+Returns `{ object: "list", type: "text", data: { "default": "zai-org-glm-5-1", "fastest": "kimi-k2-6-mini", "most_uncensored": "minimax-m2-5-uncensored", ...} }`.
 
 Use this to avoid hard-coding model IDs — resolve a trait at boot and cache for the session.
 
@@ -122,7 +126,7 @@ Use this to avoid hard-coding model IDs — resolve a trait at boot and cache fo
 curl "https://api.venice.ai/api/v1/models/compatibility_mapping?type=text"
 ```
 
-Returns `{ object: "list", data: { "gpt-4o": "llama-3.3-70b", "claude-3.5-sonnet": "...", ... } }`.
+Returns `{ object: "list", data: { "gpt-5-4-pro": "zai-org-glm-5-1", "claude-opus-4-7": "kimi-k2-6", ... } }`.
 
 Lets an OpenAI-style client call Venice with its native model IDs — Venice substitutes behind the scenes. Useful when porting existing code.
 
@@ -175,4 +179,4 @@ For extended-context runs, check if `inputTokens > p.extended?.context_token_thr
 - `offline: true` means the model exists in the catalog but can't currently serve requests — treat it as absent for scheduling.
 - `model_spec.pricing` can be **missing** on free / internal models — guard against `undefined`.
 - `traits` differ by `type` — there's no "global default"; always pass `?type=...`.
-- `compatibility_mapping` resolves model IDs, not capabilities. If your caller sends `gpt-4o-mini` but needs vision, verify via the resolved Venice model's `capabilities.supportsVision`.
+- `compatibility_mapping` resolves model IDs, not capabilities. If your caller sends `gpt-5-4-pro` but needs vision, verify via the resolved Venice model's `capabilities.supportsVision`.

@@ -122,14 +122,14 @@ or, for 400 validation errors:
 - Venice-only extensions live under:
   - `venice_parameters` (chat completions)
   - `venice_parameters` is **rejected** on `/responses` — use headers / native fields instead
-- Model feature suffixes (e.g. `llama-3.3-70b:web_search=on`) flip Venice parameters via the model ID.
+- Model feature suffixes (e.g. `zai-org-glm-5-1:web_search=on`) flip Venice parameters via the model ID.
 
 ## Versioning
 
 - `info.version` in `swagger.yaml` is a timestamp (`YYYYMMDD.HHMMSS`). There is **no** `/v2`; features roll forward on the single `/api/v1` surface and are guarded by:
   - **Alpha/Beta** tags in endpoint descriptions (e.g. `/responses`, Billing).
   - `x-guidance` / model capability flags on `/models`.
-- Always check `GET /models/{id}` for feature flags (`supportsWebSearch`, `supportsReasoning`, `supportsE2EE`, `supportsXSearch`, `supportsMultipleImages`, …) before relying on a feature.
+- Always check the model's `modelSpec.capabilities` from `GET /models` for feature flags (`supportsWebSearch`, `supportsReasoning`, `supportsE2EE`, `supportsXSearch`, `supportsMultipleImages`, …) before relying on a feature.
 
 ## Fast start checklist
 

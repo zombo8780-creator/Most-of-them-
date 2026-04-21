@@ -37,7 +37,7 @@ curl https://api.venice.ai/api/v1/responses \
   -H "Authorization: Bearer $VENICE_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "llama-3.3-70b",
+    "model": "zai-org-glm-5-1",
     "input": "Explain why the sky is blue in one paragraph."
   }'
 ```
@@ -53,7 +53,7 @@ curl https://api.venice.ai/api/v1/responses \
   "id": "resp_abc123",
   "object": "response",
   "created_at": 1735689600,
-  "model": "llama-3.3-70b",
+  "model": "zai-org-glm-5-1",
   "status": "completed",
   "output": [
     {

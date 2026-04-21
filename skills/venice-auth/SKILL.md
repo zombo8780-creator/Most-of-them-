@@ -30,7 +30,7 @@ curl https://api.venice.ai/api/v1/chat/completions \
   -H "Authorization: Bearer $VENICE_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "llama-3.3-70b",
+    "model": "zai-org-glm-5-1",
     "messages": [{"role":"user","content":"hello"}]
   }'
 ```
@@ -112,7 +112,7 @@ const res = await fetch('https://api.venice.ai/api/v1/chat/completions', {
     'X-Sign-In-With-X': makeSiwxHeader(),
   },
   body: JSON.stringify({
-    model: 'llama-3.3-70b',
+    model: 'zai-org-glm-5-1',
     messages: [{ role: 'user', content: 'hello' }],
   }),
 })
@@ -131,7 +131,7 @@ const venice = new VeniceClient(process.env.WALLET_KEY!)
 
 await venice.topUp(10)            // $10 USDC on Base (first time only)
 const res = await venice.chat({
-  model: 'llama-3.3-70b',
+  model: 'zai-org-glm-5-1',
   messages: [{ role: 'user', content: 'Hello!' }],
 })
 console.log(res.choices[0].message.content)

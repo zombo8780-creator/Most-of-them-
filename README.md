@@ -99,6 +99,24 @@ Skills are derived from the current Venice OpenAPI spec and public docs at <http
 
 See [`skills/venice-auth`](./skills/venice-auth/SKILL.md) for full signing details.
 
+## Staying in sync with the API
+
+The skills are derived from the Venice OpenAPI spec. Run the sync script to diff the currently-published spec against the endpoints and model-type enums referenced in each `SKILL.md`:
+
+```bash
+python scripts/sync_from_swagger.py --spec https://api.venice.ai/doc/api/swagger.yaml
+# or against a local copy
+python scripts/sync_from_swagger.py --spec ./swagger.yaml
+```
+
+The script prints:
+
+- endpoints in the spec that no skill references yet,
+- endpoints referenced in skills but missing from the spec (stale docs),
+- model-type enum drift (e.g. new `type=…` value added).
+
+CI runs this nightly; any drift is filed as an issue with the `sync` label.
+
 ## License
 
-Proprietary. © Venice.ai. All rights reserved. A public license will be added if/when this repository is made public.
+MIT — see [`LICENSE`](./LICENSE). Use these skills however you like; a credit link back to <https://docs.venice.ai> is appreciated but not required.

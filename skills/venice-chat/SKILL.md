@@ -24,7 +24,7 @@ curl https://api.venice.ai/api/v1/chat/completions \
   -H "Authorization: Bearer $VENICE_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "llama-3.3-70b",
+    "model": "zai-org-glm-5-1",
     "messages": [{"role": "user", "content": "Why is the sky blue?"}]
   }'
 ```
@@ -76,15 +76,7 @@ All optional. Combined with model feature suffixes, these are how you enable Ven
 
 ### Model feature suffixes
 
-Some `venice_parameters` can be set by suffixing the model ID:
-
-```
-llama-3.3-70b:web_search=on
-grok-4-20:x_search=true
-qwen3-coder-30b:strip_thinking_response=true
-```
-
-Use suffixes when the caller/library (OpenAI SDK, LangChain) can't add `venice_parameters`.
+The swagger notes that some `venice_parameters` (e.g. `strip_thinking_response`) can also be expressed as **model feature suffixes** on the `model` string — useful when the caller/library (OpenAI SDK, LangChain) can't set `venice_parameters`. The exact suffix syntax is documented separately at <https://docs.venice.ai> under "Model Feature Suffix" — consult that page for the live spec rather than guessing.
 
 ## Messages and modalities
 
@@ -94,7 +86,7 @@ Use suffixes when the caller/library (OpenAI SDK, LangChain) can't add `venice_p
 
 ```json
 {
-  "model": "qwen2.5-vl-72b",
+  "model": "zai-org-glm-5-1",
   "messages": [{
     "role": "user",
     "content": [
@@ -106,8 +98,7 @@ Use suffixes when the caller/library (OpenAI SDK, LangChain) can't add `venice_p
 ```
 
 - `url` accepts a public URL **or** `data:image/png;base64,...`.
-- Image must be ≥ 64×64 px.
-- `supportsMultipleImages` models preserve images across the whole conversation; single-image vision models only keep images from the **last** user message.
+- `capabilities.supportsMultipleImages` models preserve images across the whole conversation; single-image vision models only keep images from the **last** user message. Check `capabilities.maxImages` for the per-request cap.
 
 ### Audio input (`input_audio`)
 
@@ -184,11 +175,11 @@ Equivalent to toggling `venice_parameters.enable_web_search` / `enable_x_search`
 
 ## Reasoning models
 
-On thinking models (Qwen, DeepSeek R1, Gemini 3 Pro, o-series, …):
+On thinking models (GLM 5.1, Kimi K2.6, Claude Opus 4.7, GPT-5.4 Pro, …):
 
 ```json
 {
-  "model": "zai-org-glm-4.7",
+  "model": "zai-org-glm-5-1",
   "reasoning": {"effort": "medium", "summary": "auto"},
   "venice_parameters": {"strip_thinking_response": false},
   "messages": [...]
@@ -196,7 +187,7 @@ On thinking models (Qwen, DeepSeek R1, Gemini 3 Pro, o-series, …):
 ```
 
 - `reasoning_effort` is the OpenAI-compatible flat variant (takes precedence over `reasoning.effort`).
-- Reasoning models may return `reasoning_content` or structured `reasoning_details[]` on the assistant message. **Pass `reasoning_details` back verbatim** in the next turn — it encodes thought signatures for providers like Gemini 3 Pro.
+- Reasoning models may return `reasoning_content` or structured `reasoning_details[]` on the assistant message. **Pass `reasoning_details` back verbatim** in the next turn — it encodes thought signatures for providers like Claude Opus 4.7 and GPT-5.4 Pro.
 - Use `venice_parameters.disable_thinking: true` to skip thinking entirely on supported models.
 
 ## Structured output (`response_format`)
@@ -253,6 +244,6 @@ When `enable_web_search` is `"auto"` or `"on"`, the response includes `venice_pa
 - Image URLs must be **publicly reachable** from Venice's network. Localhost / signed S3 URLs without public access fail.
 - Audio inputs cannot be URLs — always base64.
 - Single-image vision models drop older images on each turn; chain them into the **last** user message.
-- For multi-turn with tools on Gemini 3 Pro and similar, always round-trip `reasoning_details` unchanged.
+- For multi-turn with tools on Claude Opus 4.7, GPT-5.4 Pro, and similar, always round-trip `reasoning_details` unchanged.
 - `parallel_tool_calls: true` means you MUST be prepared to execute several tools in parallel before sending a single `tool`-role reply chain.
 - `character_slug` **replaces** the default Venice system prompt. Combine with `include_venice_system_prompt: false` for total control.

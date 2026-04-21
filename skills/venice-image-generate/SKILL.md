@@ -50,10 +50,10 @@ curl https://api.venice.ai/api/v1/image/generate \
 
 | Field | Type | Default | Notes |
 |---|---|---|---|
-| `model` | string | — | **Required.** Image model ID. `GET /models?type=IMAGE`. |
+| `model` | string | — | **Required.** Image model ID. `GET /models?type=image`. |
 | `prompt` | string | — | **Required.** Max `promptCharacterLimit` from the model's `modelSpec.constraints` (typically 1500–7500). |
 | `negative_prompt` | string | — | Describe what *not* to show. Same character cap as prompt. |
-| `width`, `height` | int | 1024, 1024 | ≤ 1280 each. Supported combos depend on model's `constraints.widthHeightOptions`. |
+| `width`, `height` | int | 1024, 1024 | ≤ 1280 each. Must be divisible by `constraints.widthHeightDivisor` on the model's `modelSpec`. |
 | `aspect_ratio` | string | — | `"1:1"`, `"16:9"`, `"9:16"`, … — used by models like Nano Banana instead of width/height. |
 | `resolution` | string | — | `"1K"`, `"2K"`, `"4K"` — used by resolution-driven models. |
 | `cfg_scale` | number | model default | 0 < x ≤ 20. Higher = more prompt adherence. |
@@ -132,16 +132,18 @@ Returns a list of `styles[]`, each with a `name` you can pass to `style_preset`.
 ## Choosing a model
 
 ```bash
-curl "https://api.venice.ai/api/v1/models?type=IMAGE" \
+curl "https://api.venice.ai/api/v1/models?type=image" \
   -H "Authorization: Bearer $VENICE_API_KEY"
 ```
 
 Inspect per-model `modelSpec`:
 
-- `constraints.widthHeightOptions` / `constraints.supportsAspectRatio` / `constraints.supportsResolution`
-- `constraints.promptCharacterLimit` and `negativePromptCharacterLimit`
-- `capabilities.supportsStylePresets`, `supportsSeed`, `supportsCfgScale`
-- `pricing.perImage` — USD per image
+- `constraints.widthHeightDivisor` — `width` and `height` must both be divisible by this.
+- `constraints.aspectRatios[]` + `defaultAspectRatio` — if present, the model supports aspect-ratio-driven sizing.
+- `constraints.resolutions[]` + `defaultResolution` — if present, the model supports `resolution` (`1K`/`2K`/`4K`).
+- `constraints.steps.{default,max}` — step bounds (some models ignore `steps` entirely).
+- `constraints.promptCharacterLimit` — max prompt length (also applies to `negative_prompt`).
+- `pricing.generation.usd` — flat USD per image, or `pricing.resolutions[].usd` for resolution-tiered models.
 
 Pick a model that matches the **feature + size combo** you plan to use.
 
@@ -187,7 +189,7 @@ await fs.writeFile('out.webp', buf)
 
 | Code | Meaning |
 |---|---|
-| `400` | Bad params (e.g. size outside `widthHeightOptions`, prompt too long, variants>1 with `return_binary`). |
+| `400` | Bad params (e.g. dimensions not divisible by `widthHeightDivisor`, prompt too long, `variants>1` with `return_binary`). |
 | `401` | Auth or Pro-only model. |
 | `402` | Insufficient balance. Bearer `INSUFFICIENT_BALANCE`; x402 `PAYMENT_REQUIRED`. |
 | `413` | Payload too large. |
@@ -197,7 +199,7 @@ await fs.writeFile('out.webp', buf)
 
 ## Gotchas
 
-- Each model picks one sizing idiom: either `width`/`height`, `aspect_ratio`, or `size`. Mixing them returns `400` — match the model's `constraints`.
+- Each model picks one sizing idiom: either `width`/`height`, `aspect_ratio` + `resolution`, or (OpenAI-compat) `size`. Match the model's `constraints`.
 - `variants > 1` requires `return_binary: false` (JSON with base64 array).
 - `steps` is ignored by fast/turbo models; they hardcode step count internally.
 - `hide_watermark: true` is advisory — Venice may still watermark content flagged by safety classifiers.

@@ -52,7 +52,7 @@ With `timestamps=true`, `json` format also returns segment/word timings (schema 
 | `elevenlabs/scribe-v2` | ElevenLabs Scribe, strong on noisy audio. |
 | `stt-xai-v1` | xAI Speech-to-Text. |
 
-`GET /models?type=ASR` returns the current catalog with pricing (per-second or per-character).
+`GET /models?type=asr` returns the current catalog. ASR pricing is `pricing.per_audio_second.usd` — cost scales with audio duration.
 
 ## OpenAI SDK
 
