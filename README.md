@@ -1,6 +1,6 @@
 # Venice Skills
 
-Agent Skills for the [Venice.ai API](https://docs.venice.ai). Skills are self-contained folders of instructions (one `SKILL.md` each) that an LLM agent loads on demand to work correctly against a specific surface area of the API.
+Agent Skills for the [Venice API](https://docs.venice.ai). Skills are self-contained folders of instructions (one `SKILL.md` each) that an LLM agent loads on demand to work correctly against a specific surface area of the API.
 
 This repository is the canonical source of truth for Venice skills and is kept in sync with [`swagger.yaml`](https://docs.venice.ai). Use it with Cursor, Claude, Codex, Cline, or any other agent runtime that supports the Agent Skills format.
 
