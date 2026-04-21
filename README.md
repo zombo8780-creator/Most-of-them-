@@ -57,17 +57,36 @@ git clone git@github.com:veniceai/skills.git .cursor/skills-venice
 cp -r skills/venice-chat .cursor/skills/
 ```
 
-### Claude / Codex / other runtimes
+### Claude / Codex / OpenCode / Hermes / other runtimes
 
-Drop the `skills/` folder (or any subset) into your runtime's skills directory:
+The `SKILL.md` format is a shared spec — drop the `skills/` folder (or any subset) into whichever path your runtime watches:
 
+| Runtime | Project-local | Global |
+|---|---|---|
+| Claude Code | `.claude/skills/` | `~/.claude/skills/` |
+| Codex | `.codex/skills/` | `$CODEX_HOME/skills/` (default `~/.codex/skills/`) |
+| OpenCode | `.opencode/skills/` (also reads `.claude/skills/` + `.agents/skills/`) | `~/.config/opencode/skills/` |
+| Hermes Agent (Nous Research) | `$HERMES_OPTIONAL_SKILLS_DIR` | `~/.hermes/skills/` |
+| Cursor | `.cursor/skills/` | `~/.cursor/skills/` |
+| Cline | `.clinerules/skills/` | n/a |
+| Any other runtime | `.agents/skills/` (convention) | `~/.agents/skills/` |
+
+One-liner install for most setups:
+
+```bash
+# clone once
+git clone https://github.com/veniceai/skills.git ~/src/venice-skills
+
+# symlink into every runtime you use
+ln -s ~/src/venice-skills/skills ~/.claude/skills/venice
+ln -s ~/src/venice-skills/skills ~/.codex/skills/venice
+ln -s ~/src/venice-skills/skills ~/.config/opencode/skills/venice
+ln -s ~/src/venice-skills/skills ~/.hermes/skills/venice
 ```
-.claude/skills/
-.agents/skills/
-$CODEX_HOME/skills/
-```
 
-The agent will discover each `SKILL.md` by its frontmatter `name` + `description` and load it on demand.
+The agent discovers each `SKILL.md` by its frontmatter `name` + `description` and loads it on demand. Runtimes that define extra frontmatter fields (`version`, `platforms`, `metadata.*`, `compatibility`, …) are required by spec to **ignore unknown fields**, so the same skill file works everywhere without forks.
+
+> **NanoCoder** and similar minimal coding agents (Claw-Code, etc.) don't ship their own skills runtime — they piggyback on whichever host agent (Claude Code, OpenCode, Hermes) is driving them. Install the skills in the host and NanoCoder will see them automatically.
 
 ### As a git submodule
 
