@@ -19,7 +19,7 @@ For the SIWE header format itself, see [`venice-auth`](../venice-auth/SKILL.md).
 
 ### 1. Call an inference endpoint with no balance → `402`
 
-Any inference endpoint (e.g. `POST /chat/completions`) returns a `402` with structured `topUpInstructions` and `siwxChallenge` when the wallet balance is too low. The `PAYMENT-REQUIRED` response header also carries a base64 JSON of the same info (x402 v2 spec), for protocol-level clients that don't parse bodies.
+Any inference endpoint (e.g. `POST /chat/completions`) returns a `402` with structured `topUpInstructions` and `siwxChallenge` when the wallet balance is too low. The `PAYMENT-REQUIRED` response header carries the **x402 v2 `paymentRequired` object** (base64-encoded JSON containing `x402Version`, `error`, `resource`, `accepts[]`, and optional `extensions`) — it is **not** the same payload as the 402 body, which is a richer balance/top-up document.
 
 ```json
 {
@@ -40,7 +40,10 @@ Any inference endpoint (e.g. `POST /chat/completions`) returns a `402` with stru
     "network": "eip155:8453",
     "minimumAmountUsd": 5
   },
-  "siwxChallenge": { ... SIWE template ... }
+  "siwxChallenge": {
+    "info": { "domain": "api.venice.ai", "statement": "Sign in to Venice AI", ... },
+    "supportedChains": ["eip155:8453"]
+  }
 }
 ```
 
@@ -112,7 +115,7 @@ console.log(data.newBalance, data.amountCredited, data.paymentId)
 
 ### 4. Call inference again — credits are now debited from the wallet
 
-The `@venice-ai/x402-client` SDK wraps steps 1–4: it catches `402`, auto-tops-up to a configured amount, and retries.
+The `venice-x402-client` SDK wraps steps 1–4: it catches `402`, auto-tops-up to a configured amount, and retries.
 
 ## `GET /x402/balance/{walletAddress}`
 
@@ -198,27 +201,28 @@ Use `offset + limit` and `pagination.hasMore` for paging.
 
 - **Chain** — Base mainnet, chain ID `8453` (`eip155:8453`).
 - **Token** — USDC (6 decimals). Native USDC on Base; not USDbC.
-- **Minimum top-up** — `$5`.
-- **x402 SDK** — `npm install x402` for raw payment header signing, or `@venice-ai/x402-client` for the managed Venice flow.
+- **Minimum top-up** — `$5` by default. A small number of allow-listed wallets (e.g. internal test wallets) may have a lower per-wallet override — always use the `minimumTopUpUsd` returned in `topUpInstructions` / `/x402/balance` rather than hardcoding `5`.
+- **x402 SDK** — `npm install x402` for raw payment header signing, or `venice-x402-client` for the managed Venice flow.
 - **Receiver wallet + token contract** are returned in `topUpInstructions`; don't hardcode them.
 
 ## Errors
 
 | Code | Meaning |
 |---|---|
-| `400` | Bad payment header, invalid wallet format, below minimum, `X402_INVALID_PAYMENT` with `details.reason`. |
-| `401` | Missing / invalid SIWE. |
-| `402` | On `/x402/top-up` without header — this is the **expected discovery** response. Any other 402 indicates a bad flow. |
+| `400` | Below minimum top-up, invalid wallet format, or other validation. |
+| `401` | `X-Sign-In-With-X` header is **present** but invalid (bad signature, expired, nonce reuse, unsupported chain) — returned as `X402_SIGN_IN_*` error codes. |
+| `402` | Expected **discovery** response on `/x402/top-up` (no payment header), on `/x402/balance` and `/x402/transactions` when the SIWE header is **absent**, and on any inference endpoint when the wallet balance is insufficient. Settlement errors use `INVALID_PAYMENT` / `INVALID_PAYMENT_FORMAT` / `INSUFFICIENT_FUNDS` / `EXPIRED_PAYMENT` codes. |
 | `403` | SIWE wallet ≠ path wallet. |
 | `429` | Too many top-ups/balance checks. |
 | `500` | Settlement failure; retry with a fresh nonce. |
 
 ## Gotchas
 
-- Use the **x402 SDK** (`npm install x402`) for signing. Hand-rolling the EIP-712 `transferWithAuthorization` is risky — nonce reuse ⇒ `X402_INVALID_PAYMENT`.
+- Use the **x402 SDK** (`npm install x402`) for signing. Hand-rolling the EIP-712 `transferWithAuthorization` is risky — nonce reuse ⇒ `INVALID_PAYMENT`.
 - The SIWE signer wallet must match the `walletAddress` path param on `balance` / `transactions`. Separate wallets can't inspect each other.
 - `/x402/top-up` is unauthenticated on the **discovery** call — auth is implicit via the signed `X-402-Payment` header on settlement.
-- `balanceUsd` on `/x402/balance` is the **total** that can be consumed, including linked `diemBalanceUsd` when applicable.
-- `PAYMENT-REQUIRED` (uppercase, hyphens) is the **header** with base64 JSON; don't confuse it with the body field `code: "PAYMENT_REQUIRED"`.
+- `balanceUsd` on `/x402/balance` is the **USDC** credit balance only. `diemBalanceUsd`, when present, is a **separate** linked-account number — sum them yourself if you need a combined figure.
+- `PAYMENT-REQUIRED` (uppercase, hyphens) is the **header** with base64-encoded x402 `paymentRequired` object; don't confuse it with the body field `code: "PAYMENT_REQUIRED"` (which only appears on insufficient-balance bodies, not on auth-style 402s).
+- On `/x402/balance` and `/x402/transactions`, **missing** the SIWE header returns `402` (not 401). Only a present-but-invalid header returns `401` with a `X402_SIGN_IN_*` code.
 - The x402 v2 `accepts[].amount` is in **base units** (e.g. `"5000000"` = 5 USDC). Don't multiply by decimals again.
 - `DIEM`, `BUNDLED_CREDITS`, and Bearer-account `USD` are independent from wallet credits. For account balance, use [`venice-billing`](../venice-billing/SKILL.md).

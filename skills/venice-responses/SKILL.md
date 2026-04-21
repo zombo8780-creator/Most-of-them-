@@ -1,13 +1,13 @@
 ---
 name: venice-responses
-description: Use Venice's Alpha POST /responses endpoint - an OpenAI-compatible Responses API with typed output blocks (reasoning, message, function_call, web_search_call). Covers request shape, streaming, differences from /chat/completions, and limitations (stateless, no E2EE, no venice_parameters).
+description: Use Venice's Alpha POST /responses endpoint - an OpenAI-compatible Responses API with typed output blocks (reasoning, message, function_call, web_search_call). Covers request shape, streaming, differences from /chat/completions, supported venice_parameters subset, and E2EE behavior.
 ---
 
 # Venice Responses API (Alpha)
 
 `POST /api/v1/responses` is Venice's OpenAI-compatible Responses endpoint. It returns a **structured, typed output array** instead of a single `message.content` string — ideal for agents that need to separate reasoning, messages, tool calls, and built-in tool events.
 
-> **Alpha.** Restricted access during Alpha. Request access before relying on it in production. Schemas may change.
+> **Alpha.** Access is gated behind the `responsesApiEnabled` flag on Bearer API keys (staff-only during beta). x402 wallet auth bypasses this flag — you can pay per request without the flag. Schemas may change.
 
 ## Use when
 
@@ -22,9 +22,9 @@ Otherwise use [`venice-chat`](../venice-chat/SKILL.md) — it has more features,
 | Limitation | Detail |
 |---|---|
 | **Stateless** | No conversation persistence across requests. Send the full history each call. |
-| **No E2EE** | E2EE-capable models reject `/responses`. Use `/chat/completions` with E2EE headers for encrypted inference. |
-| **No `venice_parameters`** | Use model feature suffixes (e.g. `:web_search=on`) or OpenAI-native params instead. |
-| **Alpha cohort only** | `401` if your key isn't whitelisted for Alpha. |
+| **E2EE models default to rejection** | E2EE-capable models return `400` unless you pass `venice_parameters.enable_e2ee: false` (TEE-only mode). For end-to-end encrypted inference with E2EE headers, use `/chat/completions`. |
+| **Subset of `venice_parameters`** | `character_slug`, `enable_e2ee`, `enable_web_search`, `enable_web_scraping`, `enable_web_citations`, `include_venice_system_prompt`, `include_search_results_in_stream` are supported. `strip_thinking_response`, `disable_thinking`, `enable_x_search` are **not** wired through in Alpha. |
+| **Access gated by feature flag** | Bearer keys without `responsesApiEnabled` get `401`. x402 requests are allowed (pay-per-call). |
 
 ## Authentication
 
@@ -116,20 +116,20 @@ Top-level `status` ∈ `completed` | `failed` | `in_progress` | `cancelled`. On 
 
 Match tool outputs back by `call_id` when continuing the turn.
 
-## Common request fields (OpenAI-compatible)
+## Common request fields
 
 | Field | Notes |
 |---|---|
-| `model` | Required. Model ID, trait, or compatibility mapping. Feature suffixes allowed. |
-| `input` | Required. String or input-items array. |
-| `instructions` | System/developer instruction string (Responses equivalent of a leading system message). |
-| `tools` | Array of `{type:"function",function:{...}}`, `{type:"web_search"}`, `{type:"x_search"}`, `{type:"code_interpreter"}`, `{type:"file_search"}`, or `{type:"computer_use_preview"}` — availability depends on the model. |
+| `model` | Required. Model ID, trait, or compatibility mapping. Feature suffixes allowed (see [`venice-chat`](../venice-chat/SKILL.md#model-feature-suffixes)). |
+| `input` | Required. String or input-items array. To set system/developer context, include a leading message with `role: "system"`/`"developer"` in the input array. |
+| `tools` | Array of `{type:"function",function:{...}}` or built-in `{type:"web_search"}` — availability depends on the model. |
 | `tool_choice` | `"auto"` / `"required"` / `"none"` / `{type:"function",function:{"name":"..."}}`. |
-| `parallel_tool_calls` | Boolean. |
-| `reasoning.effort` / `reasoning.summary` | Reasoning controls for thinking models. |
-| `response_format` | `{type:"json_schema", json_schema:{...}}` for structured output. |
+| `reasoning.effort` | Reasoning effort hint for thinking models (`"low"` \| `"medium"` \| `"high"`). |
+| `temperature`, `top_p`, `max_output_tokens`, `n`, `stop`, `seed`, `prompt_cache_key` | Standard generation controls — translated to `/chat/completions` equivalents server-side. |
 | `stream` | Boolean. SSE response with typed events (`response.created`, `response.output_item.added`, `response.output_text.delta`, `response.completed`, …). |
-| `metadata` | Key/value pairs. |
+| `venice_parameters` | Subset listed above. Example: `{"character_slug":"alan-watts","enable_web_search":"on"}`. |
+
+Fields commonly found in OpenAI's Responses API that are **not** in Venice's Alpha schema (and silently ignored or rejected by Zod): `instructions`, `metadata`, `parallel_tool_calls`, `response_format`, `store`, `previous_response_id`, `background`. For `response_format` / JSON-schema structured output, use `/chat/completions`.
 
 ## Streaming
 
@@ -138,8 +138,9 @@ With `stream: true`, the response is an SSE stream of typed events. Typical flow
 ```
 event: response.created
 event: response.output_item.added        # type=reasoning
-event: response.reasoning_summary.delta
+event: response.reasoning.delta
 event: response.output_item.added        # type=message
+event: response.content_part.added
 event: response.output_text.delta
 event: response.output_text.delta
 event: response.output_item.done
@@ -150,8 +151,9 @@ Consume events in order and reconstruct `output[]` client-side; the shape on `re
 
 ## Authentication & error responses
 
-- `401` — auth failed **or** this model is only available to Pro users (Alpha cohort / gated models).
-- `402` — insufficient balance. Bearer → `INSUFFICIENT_BALANCE`. x402 → `PAYMENT_REQUIRED` with `topUpInstructions` and `siwxChallenge`.
+- `400` — bad request; also returned when an E2EE-capable model is used without `venice_parameters.enable_e2ee: false`.
+- `401` — auth failed, or Bearer key lacks `responsesApiEnabled`, or the model is Pro-only and you're on an INFERENCE key / x402 wallet.
+- `402` — insufficient balance. Bearer → `{ error: "INSUFFICIENT_BALANCE" }`. x402 → `PAYMENT_REQUIRED` with `topUpInstructions` and `siwxChallenge` (see [`venice-x402`](../venice-x402/SKILL.md)).
 - `429` — rate-limited.
 - `500` — inference failed.
 
@@ -159,8 +161,9 @@ Consume events in order and reconstruct `output[]` client-side; the shape on `re
 
 ## Migration notes
 
-- Port `messages` → pass as `input` (string or typed array).
-- `venice_parameters.character_slug` → **not supported**; inline the character's system prompt via `instructions`.
-- `venice_parameters.enable_web_search` → append `:web_search=on` to the model ID **or** add `{"type":"web_search"}` to `tools`.
-- `venice_parameters.strip_thinking_response` → append `:strip_thinking_response=true` to model ID.
-- Full E2EE flow → stay on `/chat/completions`.
+- Port `messages` → pass as `input` (string, or typed array with leading `{role:"system"|"developer", content:"..."}`).
+- `venice_parameters.character_slug` → **supported**; pass inside `venice_parameters` or as a model feature suffix (`:character_slug=alan-watts`).
+- `venice_parameters.enable_web_search` → pass inside `venice_parameters`, or append `:enable_web_search=on` to the model ID, or add `{"type":"web_search"}` to `tools`.
+- `venice_parameters.strip_thinking_response` / `disable_thinking` → **not supported on `/responses`** in Alpha; stay on `/chat/completions` for these.
+- Full E2EE flow (E2EE request headers + encrypted response) → stay on `/chat/completions`. For TEE-only inference on an E2EE-capable model, pass `venice_parameters.enable_e2ee: false` here.
+- `response_format` / JSON-schema structured output → stay on `/chat/completions`.

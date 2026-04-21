@@ -21,10 +21,13 @@ Three endpoints, all under `Preview` (API may change):
 | `GET /characters/{slug}` | Fetch one character. |
 | `GET /characters/{slug}/reviews` | Paginated public reviews. |
 
+All three endpoints require authentication (Bearer API key or x402 SIWE) — see [`venice-auth`](../venice-auth/SKILL.md). There is no unauthenticated public endpoint.
+
 ## `GET /characters`
 
 ```bash
-curl "https://api.venice.ai/api/v1/characters?search=philosopher&sortBy=highestRating&limit=20"
+curl "https://api.venice.ai/api/v1/characters?search=philosopher&sortBy=highestRating&limit=20" \
+  -H "Authorization: Bearer $VENICE_API_KEY"
 ```
 
 ### Query parameters
@@ -59,7 +62,8 @@ curl "https://api.venice.ai/api/v1/characters?search=philosopher&sortBy=highestR
 ## `GET /characters/{slug}`
 
 ```bash
-curl "https://api.venice.ai/api/v1/characters/alan-watts"
+curl "https://api.venice.ai/api/v1/characters/alan-watts" \
+  -H "Authorization: Bearer $VENICE_API_KEY"
 ```
 
 Returns the same object shape above, wrapped as `{ object: "character", data: { ... } }`. `404` if the slug is unknown or unpublished.
@@ -67,7 +71,8 @@ Returns the same object shape above, wrapped as `{ object: "character", data: { 
 ## `GET /characters/{slug}/reviews`
 
 ```bash
-curl "https://api.venice.ai/api/v1/characters/alan-watts/reviews?page=1&pageSize=20"
+curl "https://api.venice.ai/api/v1/characters/alan-watts/reviews?page=1&pageSize=20" \
+  -H "Authorization: Bearer $VENICE_API_KEY"
 ```
 
 Response:
@@ -136,7 +141,9 @@ Useful when the client library (OpenAI SDK, LangChain, etc.) can't add `venice_p
 ### Character picker UI
 
 ```ts
-const res = await fetch(`${base}/characters?sortBy=featured&limit=50`)
+const res = await fetch(`${base}/characters?sortBy=featured&limit=50`, {
+  headers: { Authorization: `Bearer ${process.env.VENICE_API_KEY}` },
+})
 const { data } = await res.json()
 // show data[].photoUrl, data[].name, data[].stats.averageRating
 // pick a slug, then pass into chat:
@@ -164,7 +171,7 @@ await chat({
 | Code | Meaning |
 |---|---|
 | `400` | Bad query params (e.g. `limit > 100`). |
-| `401` | Only when you pass a Bearer token and the token is invalid. Unauthenticated listing works. |
+| `401` | Missing or invalid auth. All three endpoints require a Bearer key or SIWE header. |
 | `404` | Unknown slug. |
 | `500` | Transient. Retry. |
 

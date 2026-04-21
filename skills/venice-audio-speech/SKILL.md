@@ -39,7 +39,7 @@ Response is the raw audio (`Content-Type` matches `response_format`).
 | Field | Type | Default | Notes |
 |---|---|---|---|
 | `input` | string | — | **Required.** Up to **4096** characters. |
-| `model` | enum | `tts-xai-v1` | See model list below. |
+| `model` | enum | `tts-kokoro` (OpenAPI schema default) | See model list below. `tts-xai-v1` is the recommended frontier default; pick the model that fits your voice + language needs. |
 | `voice` | enum | model-specific (e.g. `eve` for `tts-xai-v1`) | **Voice is model-specific** — wrong combo = `400`. See voice families. |
 | `response_format` | `mp3` / `opus` / `aac` / `flac` / `wav` / `pcm` | `mp3` | `pcm` returns 24 kHz signed-16 LE for pipelines. |
 | `speed` | number | `1.0` | Range `0.25–4.0`. |
@@ -53,8 +53,8 @@ Response is the raw audio (`Content-Type` matches `response_format`).
 
 | Model ID | Family | Highlights |
 |---|---|---|
-| `tts-xai-v1` | xAI | **Default.** Conversational style, ISO 639-1 language hints. |
-| `tts-kokoro` | Kokoro | Multilingual, many voices across languages. |
+| `tts-xai-v1` | xAI | **Recommended default.** Conversational style, ISO 639-1 language hints. |
+| `tts-kokoro` | Kokoro | OpenAPI schema default. Multilingual, many voices across languages. |
 | `tts-qwen3-0-6b` / `tts-qwen3-1-7b` | Qwen 3 | Emotion control via `prompt`, temperature, top_p. |
 | `tts-inworld-1-5-max` | Inworld | Character-driven voices (Craig, Ashley, …). |
 | `tts-chatterbox-hd` | Chatterbox | HD voices (Aurora, Blade, …), temperature. |
@@ -63,7 +63,7 @@ Response is the raw audio (`Content-Type` matches `response_format`).
 | `tts-minimax-speech-02-hd` | MiniMax | WiseWoman, DeepVoiceMan, … |
 | `tts-gemini-3-1-flash` | Gemini Flash | Star-named voices (Achernar, Achird, Zephyr, …). |
 
-Always inspect the entry for your model in `GET /models?type=tts` — `modelSpec` exposes the authoritative voice list plus `supportsPromptParam`, `supportsTemperatureParam`, `supportsTopPParam`.
+Always inspect the entry for your model in `GET /models?type=tts` — `model_spec.voices` is the authoritative voice list. Per-model toggles like `supportsPromptParam`, `supportsTemperatureParam`, `supportsTopPParam` live on the internal model definitions but are not currently exposed on `/models` — treat the request schema below (`instructions`, `temperature`, `top_p`) as the support matrix.
 
 ## Voice families (by prefix)
 
@@ -138,10 +138,9 @@ For other families, emotion comes from the **voice choice itself** (e.g. Inworld
 
 | Code | Meaning |
 |---|---|
-| `400` | Bad voice/model combo, input too long (>4096), language hint rejected by a strict model. |
+| `400` | Bad voice/model combo, input too long (>4096), language hint rejected by a strict model, invalid voice for the chosen model. |
 | `401` | Auth / Pro-only model. |
 | `402` | Insufficient balance. |
-| `422` | Content policy violation on the input text. |
 | `429` | Rate limited. |
 | `500` / `503` | Inference / capacity issue — retry with jitter. |
 

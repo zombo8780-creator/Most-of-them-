@@ -13,7 +13,7 @@ Three read-only endpoints for account-level billing and analytics. All are under
 | `GET /billing/usage` | Paginated per-request ledger. JSON or CSV. |
 | `GET /billing/usage-analytics` | Aggregated breakdowns: by date, model, API key. |
 
-All require Bearer auth (not x402 — for wallet balances, use [`venice-x402`](../venice-x402/SKILL.md)). Admin/root keys see full account; inference keys see only their own scope when applicable.
+All require Bearer auth (not x402 — for wallet balances, use [`venice-x402`](../venice-x402/SKILL.md)). `GET /billing/balance` and `GET /billing/usage` require an **ADMIN** key — an `INFERENCE` key gets `401`. `GET /billing/usage-analytics` works on any authenticated key (scoped to the account behind the key).
 
 ## Currency / priority
 
@@ -42,7 +42,8 @@ curl https://api.venice.ai/api/v1/billing/balance \
 }
 ```
 
-- `canConsume: false` means all buckets are empty — top up or stake.
+- `canConsume: false` means both DIEM and USD buckets are empty on this endpoint — `canConsume` here is `hasPositiveDiemBalance || usdBalance > 0` and does **not** factor in bundled credits (which are consulted during the actual request in `getConsumableBalanceForRequest`).
+- `consumptionCurrency` is `"DIEM"`, `"USD"`, or `null` (when neither applies).
 - `balances.diem` is `null` if not staking.
 - `diemEpochAllocation` is the ceiling for the current epoch — `balances.diem / diemEpochAllocation` = remaining fraction.
 
@@ -69,7 +70,7 @@ curl "https://api.venice.ai/api/v1/billing/usage?limit=200&page=1&sortOrder=desc
 ### Accept header
 
 - `application/json` (default) — paginated JSON.
-- `text/csv` — downloads `billing_usage.csv` (sets `Content-Disposition`).
+- `text/csv` — downloads `billing-usage.csv` (sets `Content-Disposition`).
 
 ### Response (JSON)
 
@@ -144,6 +145,7 @@ curl "https://api.venice.ai/api/v1/billing/usage-analytics?lookback=7d" \
   "byModelDaily": [
     { "date": 1705276800000, "GLM 5.1": 5.5, "Claude Opus 4.7": 3.2 }
   ],
+  "byModelDailyUsd": [...],
   "topModels": ["GLM 5.1", "Claude Opus 4.7"],
   "byKey": [
     { "apiKeyId": "key_abc123", "description": "Production Key",
@@ -152,6 +154,7 @@ curl "https://api.venice.ai/api/v1/billing/usage-analytics?lookback=7d" \
       "totalUsd": 0, "totalDiem": 4, "totalUnits": 25000 }
   ],
   "byKeyDaily": [...],
+  "byKeyDailyUsd": [...],
   "topKeyNames": [...]
 }
 ```
@@ -175,7 +178,7 @@ if (!canConsume) throw new Error('Venice balance exhausted — top up before con
 curl "https://api.venice.ai/api/v1/billing/usage?startDate=2026-04-01T00:00:00Z&endDate=2026-04-30T23:59:59Z&limit=500" \
   -H "Authorization: Bearer $VENICE_API_KEY" \
   -H "Accept: text/csv" \
-  -o billing_april.csv
+  -o billing-april.csv
 ```
 
 Paginate via `page=1,2,3,...` until `page > totalPages`.
@@ -191,8 +194,8 @@ const a = await fetch(`${base}/billing/usage-analytics?lookback=30d`, { headers 
 
 | Code | Meaning |
 |---|---|
-| `400` | Bad params (`startDate` without `endDate`, `lookback > 90d`). |
-| `401` | Auth failed. |
+| `400` | Bad params (`startDate` without `endDate`, calendar range > 90 days). `lookback=100d` is silently **clamped** to 90 days rather than rejected. |
+| `401` | Auth failed, or `INFERENCE` key used on `/billing/balance` or `/billing/usage` (ADMIN required). |
 | `500` | Internal error. |
 | `504` | Analytics query timed out — shorten `lookback` or date range. |
 

@@ -126,7 +126,7 @@ Note: `enable_e2ee` and `enable_x_search` can **only** be set via `venice_parame
 ```
 
 - `url` accepts a public URL **or** `data:image/png;base64,...`.
-- `capabilities.supportsMultipleImages` models preserve images across the whole conversation; single-image vision models only keep images from the **last** user message. Check `capabilities.maxImages` for the per-request cap.
+- Models with `model_spec.capabilities.supportsMultipleImages: true` preserve images across the whole conversation; single-image vision models only keep images from the **last** user message. Check `model_spec.capabilities.maxImages` for the per-request cap.
 
 ### Audio input (`input_audio`)
 
@@ -164,7 +164,7 @@ Any text / image_url / input_audio / video_url part can carry:
 {"cache_control": {"type": "ephemeral", "ttl": "1h"}}
 ```
 
-Combine with `prompt_cache_key` and `prompt_cache_retention: "24h"` on the root request for predictable cache routing. Cache read / write pricing is model-specific — check `modelSpec.pricing` on `/models`.
+Combine with `prompt_cache_key` and `prompt_cache_retention: "24h"` on the root request for predictable cache routing. Cache read / write pricing is model-specific — check `model_spec.pricing` on `/models`.
 
 ## Tools & function calling
 
@@ -257,7 +257,7 @@ E2EE is **not** supported on `/responses` — use `/chat/completions` for encryp
 
 ## Web-search answers
 
-When `enable_web_search` is `"auto"` or `"on"`, the response includes `venice_parameters.web_search_citations[]` (or equivalent citations block) with each URL, title, and snippet. Turn on `enable_web_citations` to have the model insert `^1^` superscripts inline.
+When `enable_web_search` is `"auto"` or `"on"`, the response includes `venice_parameters.web_search_citations[]` where each entry has `url`, `title`, `content` (snippet), and `date`. Turn on `enable_web_citations` to have the model insert `^1^` superscripts inline.
 
 ## Error handling specifics
 

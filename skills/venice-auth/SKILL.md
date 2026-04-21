@@ -1,6 +1,6 @@
 ---
 name: venice-auth
-description: Authenticate to the Venice API with a Bearer API key or with an x402 / SIWE wallet. Covers header formats, the SIWE message fields, TTL and nonce rules, the @venice-ai/x402-client SDK, and how to choose between the two modes.
+description: Authenticate to the Venice API with a Bearer API key or with an x402 / SIWE wallet. Covers header formats, the SIWE message fields, TTL and nonce rules, the venice-x402-client SDK, and how to choose between the two modes.
 ---
 
 # Venice Authentication
@@ -63,17 +63,18 @@ Where the decoded JSON is:
 
 | Field | Value |
 |---|---|
-| `domain` | `outerface.venice.ai` |
-| `uri` | `https://outerface.venice.ai` |
+| `domain` | One of the allow-listed Venice domains: `venice.ai`, `api.venice.ai`, `outerface.venice.ai`, `preview.venice.ai`, `staging.venice.ai` (plus `localhost` in dev). The server's own generated challenge uses `api.venice.ai`. |
+| `uri` | Matching `https://<domain>` URL. |
 | `version` | `"1"` |
-| `chainId` | `8453` |
 | `address` | the wallet's checksummed address |
-| `statement` | `"Sign in to Venice API"` |
-| `nonce` | random 16-char hex, single-use |
-| `issuedAt` / `expirationTime` | ISO-8601. Server enforces a hard **5-minute** window from `issuedAt`. |
+| `statement` | `"Sign in to Venice AI"` (what the server's generated challenge uses — any string is accepted, this one keeps consent UX consistent). |
+| `nonce` | random 16-char hex, single-use per wallet |
+| `issuedAt` / `expirationTime` | ISO-8601. Server enforces a hard **5-minute** window from `issuedAt` (`expirationTime` is informational only). |
 | `chainId` | `8453` — accepted as number (`8453`), numeric string (`"8453"`), or CAIP-2 (`"eip155:8453"`). |
 
-The header is short-lived — generate a fresh one at most every ~4 minutes (server accepts up to 5 min from `issuedAt`). The payload `timestamp` must be within **30 seconds** of the SIWE `issuedAt`, and no more than 30 seconds ahead of server time. Nonces are single-use per wallet — reuse within ~5.5 minutes is rejected.
+The header is short-lived — generate a fresh one at most every ~4 minutes (server accepts up to 5 min from `issuedAt`). The payload `timestamp` must be within **30 seconds** of the SIWE `issuedAt`, and `issuedAt` itself must not be more than 30 seconds ahead of server time. Nonces are single-use per wallet — reuse within ~5.5 minutes is rejected with `X402_SIGN_IN_NONCE_REUSED`.
+
+Domain is validated against the allow-list above — **not** against the incoming request's `Host` header. Passing any allow-listed domain (e.g. `api.venice.ai`) is fine regardless of which Venice host you hit.
 
 ### Manual signing (TypeScript)
 
@@ -85,10 +86,10 @@ const wallet = new Wallet(process.env.WALLET_KEY!)
 
 function makeSiwxHeader() {
   const msg = new SiweMessage({
-    domain: 'outerface.venice.ai',
+    domain: 'api.venice.ai',
     address: wallet.address,
-    statement: 'Sign in to Venice API',
-    uri: 'https://outerface.venice.ai',
+    statement: 'Sign in to Venice AI',
+    uri: 'https://api.venice.ai',
     version: '1',
     chainId: 8453,
     nonce: crypto.randomUUID().replace(/-/g, '').slice(0, 16),
@@ -122,11 +123,11 @@ const res = await fetch('https://api.venice.ai/api/v1/chat/completions', {
 ### SDK shortcut
 
 ```bash
-npm install @venice-ai/x402-client
+npm install venice-x402-client
 ```
 
 ```ts
-import { VeniceClient } from '@venice-ai/x402-client'
+import { VeniceClient } from 'venice-x402-client'
 
 const venice = new VeniceClient(process.env.WALLET_KEY!)
 
@@ -168,7 +169,8 @@ Both schemes can co-exist: a Pro user may generate a **Web3 API key** via `POST 
 
 | Status | Likely cause |
 |---|---|
-| `401 Authentication failed` | bad/expired key, SIWE older than 5 min from `issuedAt`, `payload.timestamp` off by >30s, wrong `domain`/`uri` fields, chain id != `8453`, nonce replayed. The server returns a specific code like `X402_SIGN_IN_EXPIRED`, `X402_SIGN_IN_TIMESTAMP_MISMATCH`, `X402_SIGN_IN_DOMAIN_MISMATCH`, `X402_SIGN_IN_NONCE_REUSED` in the error body. |
+| `401 Authentication failed` | bad/expired key, SIWE older than 5 min from `issuedAt`, `payload.timestamp` off by >30s, `domain` not in the Venice allow-list, unsupported chain id, nonce replayed. The server returns a specific code like `X402_SIGN_IN_EXPIRED`, `X402_SIGN_IN_TIMESTAMP_MISMATCH`, `X402_SIGN_IN_DOMAIN_MISMATCH`, `X402_SIGN_IN_NONCE_REUSED`, or `X402_SIGN_IN_INVALID_CHAIN_ID` (code always set; `message` may fall back to generic text for some codes). |
+| `402 x402` (no header) | `X-Sign-In-With-X` is **missing** on an SIWE-gated route (`/x402/balance`, `/x402/transactions`). Add the header. |
 | `401 This model is only available to Pro users` | using x402 or an INFERENCE key on a gated model — switch to a Pro Bearer key |
 | `402 PAYMENT_REQUIRED` (x402) | wallet balance too low; read `topUpInstructions` and top up via `/x402/top-up` |
 | `402 INSUFFICIENT_BALANCE` (Bearer) | DIEM + USD + bundled credits are all empty; top up at venice.ai |

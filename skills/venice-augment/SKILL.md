@@ -50,7 +50,7 @@ curl -X POST https://api.venice.ai/api/v1/augment/text-parser \
 
 - `tokens` is the count of the extracted text — use it to pre-budget a downstream chat request.
 - Scanned image PDFs are not OCR'd. Run images through a vision model via `/chat/completions` instead.
-- Documents are processed **in memory only** and immediately discarded. No logging.
+- Documents are processed **in memory only** and **content is not retained** after the response. (Operational metadata like request IDs and error traces may still be logged for debugging — this is a no-content-retention guarantee, not a zero-log guarantee.)
 
 ## `POST /augment/scrape` — URL → markdown
 
@@ -132,7 +132,7 @@ curl -X POST https://api.venice.ai/api/v1/augment/search \
 
 - Pair with `/chat/completions` + `venice_parameters.enable_web_citations` to generate cited answers. See [`venice-chat`](../venice-chat/SKILL.md).
 - For "search + read" pipelines, feed `results[*].url` into `/augment/scrape` in parallel.
-- Keep queries under ~200 chars; longer queries are truncated or rejected.
+- `query` is validated as 1–400 chars. Anything longer is **rejected** (400 `INVALID_REQUEST`), not truncated.
 
 ## Errors
 

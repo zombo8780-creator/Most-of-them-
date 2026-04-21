@@ -8,10 +8,10 @@ description: Async music / audio-track generation via Venice. Covers the /audio/
 Music (and long-form voice) generation is **asynchronous**. The flow is:
 
 ```
-POST /audio/quote      → price in USD
-POST /audio/queue      → { queue_id }      (funds reserved)
-POST /audio/retrieve   → status or binary audio
-POST /audio/complete   → finalize & delete media
+POST /api/v1/audio/quote      → price in USD
+POST /api/v1/audio/queue      → { queue_id }      (funds reserved)
+POST /api/v1/audio/retrieve   → status or binary audio
+POST /api/v1/audio/complete   → finalize & delete media
 ```
 
 For short text-to-speech, use the synchronous [`venice-audio-speech`](../venice-audio-speech/SKILL.md) endpoint instead.
@@ -159,14 +159,14 @@ async function generateTrack() {
 
 ## Capability probing
 
-Before calling `/audio/queue`, inspect the model entry returned by `GET /models?type=music` — each row's `modelSpec` exposes (among other fields):
+Before calling `/audio/queue`, inspect the model entry returned by `GET /models?type=music` — each row's `model_spec` exposes (among other fields):
 
 - `supports_lyrics`, `lyrics_required`, `supports_lyrics_optimizer`
 - `supports_force_instrumental`, `supports_speed`, `supports_language_code`
 - `voices[]`, `default_voice`
 - `min_prompt_length`, `prompt_character_limit`
 - `min_speed`, `max_speed`
-- `pricing.generation`, `pricing.per_second`, or `pricing.per_thousand_characters` (depending on the model family)
+- `pricing.generation` (per-job), `pricing.per_second` (per second generated), `pricing.per_thousand_characters` (character-priced narration), or `pricing.durations` (duration-tiered map: `{ "<tier>": { usd, diem, min_seconds, max_seconds } }`) — each model uses one of these shapes
 
 ## Errors
 

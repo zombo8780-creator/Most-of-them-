@@ -11,9 +11,9 @@ description: Call POST /embeddings on Venice. Covers request shape (input, model
 
 - You're building retrieval / RAG / similarity search.
 - You need text clustering, classification, deduplication, or reranking.
-- You want Venice's E2EE / private inference property on vectors.
+- You want Venice's "no-training, no-retention" stance on inference inputs — embeddings are generated and returned; the API does not publish E2EE semantics on `/embeddings` the way it does on selected chat models.
 
-Text-only. For image/multimodal signals, either run images through a vision chat model and embed the description, or pick a multimodal-capable embedding model from `GET /models?type=embedding` (the catalog changes; inspect `modelSpec` on each row).
+Text-only. For image/multimodal signals, either run images through a vision chat model and embed the description, or pick a multimodal-capable embedding model from `GET /models?type=embedding` (the catalog changes; inspect `model_spec` on each row).
 
 ## Minimal request
 
@@ -46,10 +46,10 @@ curl https://api.venice.ai/api/v1/embeddings \
 | `model` | string | **Required.** Model ID from `GET /models?type=embedding`. |
 | `input` | string \| string[] \| number[] \| number[][] | **Required.** Single string, array of strings (≤ 2048 entries), or pre-tokenized arrays. |
 | `encoding_format` | `"float"` \| `"base64"` | Default `"float"`. Use `"base64"` for ~4× payload shrinkage; decode client-side. |
-| `dimensions` | integer | Optional. Truncate output dimensions. Only honored when `modelSpec.supportsCustomDimensions === true`. |
+| `dimensions` | integer | Optional. Truncate output dimensions. Only meaningful when the model's `model_spec.supportsCustomDimensions === true` — behavior on non-supporting models is model-dependent; test a small call before relying on it. |
 | `user` | string | Accepted for OpenAI compat. Discarded by Venice. |
 
-`input` max tokens per string is capped at the model's `modelSpec.maxInputTokens` (typically 8192). Batch arrays are capped at **2048 items**. Venice returns one embedding per element, in order, with matching `index`.
+`input` max tokens per string is capped at the model's `model_spec.maxInputTokens` (typically 8192). Batch arrays are capped at **2048 items**. Venice returns one embedding per element, in order, with matching `index`.
 
 ## Response headers & compression
 
@@ -100,10 +100,10 @@ async function embedBatch(texts: string[], batchSize = 64) {
 
 Query `GET /models?type=embedding` for the current catalog. Each entry exposes:
 
-- `modelSpec.embeddingDimensions` — native output dimension (e.g. 1024 for BGE-M3).
-- `modelSpec.maxInputTokens` — max tokens per input string.
-- `modelSpec.supportsCustomDimensions` — whether `dimensions` can truncate the output.
-- `modelSpec.pricing.input.usd` / `.diem` — cost per **million** input tokens.
+- `model_spec.embeddingDimensions` — native output dimension (e.g. 1024 for BGE-M3).
+- `model_spec.maxInputTokens` — max tokens per input string.
+- `model_spec.supportsCustomDimensions` — whether `dimensions` can truncate the output.
+- `model_spec.pricing.input.usd` / `.diem` — cost per **million** input tokens.
 
 Built-in options include `text-embedding-bge-m3`, `text-embedding-bge-en-icl`, `text-embedding-qwen3-8b`, `text-embedding-qwen3-0-6b`, `text-embedding-multilingual-e5-large-instruct`, `text-embedding-3-small`, `text-embedding-3-large`, `gemini-embedding-2-preview`, `text-embedding-nemotron-embed-vl-1b-v2`.
 
@@ -123,7 +123,7 @@ Always pin the model ID — cosine distances are **not** comparable across diffe
 
 ## Gotchas
 
-- `dimensions` only works when `modelSpec.supportsCustomDimensions === true`; otherwise Venice ignores it or returns `400`.
+- `dimensions` is only meaningful when `model_spec.supportsCustomDimensions === true`. Behavior on other models is model-dependent — test with a small request before relying on it.
 - `input` must not be empty; Venice rejects empty strings with `400`.
 - Whether the returned vectors are L2-normalized depends on the model — verify with `Math.hypot(...v) ≈ 1` before assuming.
 - For RAG, store `model` alongside the vector so you can re-embed on upgrade.

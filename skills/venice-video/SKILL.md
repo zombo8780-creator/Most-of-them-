@@ -18,7 +18,7 @@ Video is **asynchronous** — like audio music. Five endpoints:
 ## Use when
 
 - You need text-to-video, image-to-video, video upscale, video-with-audio, or video transcription.
-- You can tolerate async (P80 typical execution ≈ 60–180 s depending on model/duration).
+- You can tolerate async execution (single-digit seconds to several minutes depending on model, duration, and queue depth — inspect `average_execution_time` and `execution_duration` on `/video/retrieve` for your job's live estimate).
 - You want to price a job precisely before committing (`/video/quote`).
 
 ## Lifecycle — generation
@@ -92,7 +92,7 @@ Availability depends on the model — check `GET /models?type=video`.
 | Field | Type | Notes |
 |---|---|---|
 | `model` | string | Required. |
-| `prompt` | string, ≤ 2500–3500 | Required for most models. Limit varies per model. |
+| `prompt` | string, ≤ 2500–3500 | **Required** (min length 1). Max length varies per model. |
 | `negative_prompt` | string, ≤ 2500–3500 | — |
 | `duration` | enum `2s..30s` or `Auto` | Required. Model-specific subset. |
 | `aspect_ratio` | `1:1`, `2:3`, `3:2`, `3:4`, `4:3`, `9:16`, `16:9`, `21:9` | Some models ignore. |
@@ -202,14 +202,16 @@ async function waitForVideo(model: string, queueId: string, downloadUrl?: string
 
 | Code | Meaning |
 |---|---|
-| `400` | Bad params (duration/resolution not supported by model, missing required `image_url` for i2v, etc.). |
+| `400` | Bad params (duration/resolution not supported by model, missing required `image_url` for i2v, missing `prompt`, etc.). |
 | `401` | Auth / Pro-only. |
 | `402` | Insufficient balance. |
 | `403` | Model unavailable in your region. |
-| `413` | Request payload too large — shrink images / audio. |
-| `422` | Content policy violation. |
+| `413` | Request payload too large — shrink images / audio. (Returned from `/video/queue`.) |
+| `422` | Content policy violation. (Returned from `/video/queue`.) |
 | `500` | Inference failed. |
-| `503` | Model at capacity — retry later. |
+| `503` | Model at capacity — retry later. **On `/video/retrieve`**, returned when the queue is backed up. |
+
+`/video/queue` does not document `503` in the spec — upstream capacity issues surface there as `500`. Watch for `503` specifically on `/video/retrieve`.
 
 ## Gotchas
 

@@ -39,7 +39,7 @@ curl https://api.venice.ai/api/v1/models \
   -H "Authorization: Bearer $VENICE_API_KEY"
 
 # x402 / SIWE (one-liner via the SDK)
-import { VeniceClient } from '@venice-ai/x402-client'
+import { VeniceClient } from 'venice-x402-client'
 const v = new VeniceClient(process.env.WALLET_KEY)
 await v.models.list()
 ```
@@ -94,10 +94,10 @@ await v.models.list()
 ## Pricing model at a glance
 
 - Pricing is **dynamic per request**, metered in USD.
-- Every inference endpoint in the spec carries an `x-payment-info` block with `min: 0.001` and `max: 10.00` per call (higher for bulk video/audio).
+- Paid inference endpoints in the spec carry an `x-payment-info` block with `min` and `max` bounds in USD (typically `min: 0.001`, `max: 10.00`; higher for bulk video/audio). Read-only discovery routes like `GET /models`, `/models/traits`, and `/models/compatibility_mapping` do not.
 - Pro (Bearer) accounts draw from **DIEM** (staked credits), **USD** balance, and **bundled credits** in priority order.
 - x402 (wallet) users draw from a prepaid **USDC credit balance** on Base.
-- The authoritative per-model price is on `GET /models` → `modelSpec.pricing` (see [`venice-models`](../venice-models/SKILL.md)).
+- The authoritative per-model price is on `GET /models` → `model_spec.pricing` (when present — video models omit it; use `/video/quote` for video pricing) (see [`venice-models`](../venice-models/SKILL.md)).
 
 ## Standard error shape
 
@@ -129,12 +129,12 @@ or, for 400 validation errors:
 - `info.version` in `swagger.yaml` is a timestamp (`YYYYMMDD.HHMMSS`). There is **no** `/v2`; features roll forward on the single `/api/v1` surface and are guarded by:
   - **Alpha/Beta** tags in endpoint descriptions (e.g. `/responses`, Billing).
   - `x-guidance` / model capability flags on `/models`.
-- Always check the model's `modelSpec.capabilities` from `GET /models` for feature flags (`supportsWebSearch`, `supportsReasoning`, `supportsE2EE`, `supportsXSearch`, `supportsMultipleImages`, …) before relying on a feature.
+- Always check the model's `model_spec.capabilities` from `GET /models` for feature flags (`supportsWebSearch`, `supportsReasoning`, `supportsE2EE`, `supportsXSearch`, `supportsMultipleImages`, `supportsFunctionCalling`, `supportsAudioInput`, `supportsVideoInput`, …) before relying on a feature.
 
 ## Fast start checklist
 
 1. Read [`venice-auth`](../venice-auth/SKILL.md) and choose Bearer vs x402.
-2. `GET /models` — pick a model and note its `modelSpec.constraints` and `pricing`.
+2. `GET /models` — pick a model and note its `model_spec.constraints` and `model_spec.pricing`.
 3. Wire up one happy-path call from the matching skill.
 4. Add error handling using [`venice-errors`](../venice-errors/SKILL.md) (402, 422, 429).
 5. Hook up observability via `X-Balance-Remaining` / `/billing/usage` / `/x402/transactions`.

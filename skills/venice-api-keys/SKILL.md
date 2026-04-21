@@ -25,8 +25,8 @@ Limits: key creation is capped at **20 requests/minute** and **500 active keys p
 
 | Type | Can call |
 |---|---|
-| `INFERENCE` | Only inference endpoints (`/chat`, `/image`, `/audio`, `/video`, `/embeddings`, `/augment`, `/crypto/rpc`, …). |
-| `ADMIN` | Full API, including `/api_keys`, `/billing/*`. |
+| `INFERENCE` | Inference endpoints plus any route that only requires authentication — e.g. `/chat/*`, `/image/*`, `/audio/*`, `/video/*`, `/embeddings`, `/augment/*`, `/crypto/rpc`, `/characters`, `/api_keys/rate_limits*`, `/support-bot`. Rejected from admin routes listed below with `401`. |
+| `ADMIN` | Everything an `INFERENCE` key can do, plus admin-only routes: `POST/PATCH/DELETE /api_keys`, `GET /api_keys` (list), `GET /api_keys/{id}`, `GET /billing/balance`, `GET /billing/usage`. |
 
 A leaf app should almost always use **`INFERENCE`** keys — per-app, per-user, with consumption caps.
 
@@ -37,19 +37,24 @@ curl https://api.venice.ai/api/v1/api_keys \
   -H "Authorization: Bearer $ADMIN_KEY"
 ```
 
-Returns each key as:
+Returns:
 
 ```json
 {
-  "id": "uuid",
-  "apiKeyType": "INFERENCE",
-  "description": "backend prod",
-  "createdAt": "2025-10-01T12:00:00Z",
-  "expiresAt": null,
-  "lastUsedAt": "2026-04-20T10:05:00Z",
-  "last6Chars": "2V2jNW",
-  "consumptionLimits": { "usd": 50, "diem": 10 },
-  "usage": { "trailingSevenDays": { "usd": "4.20", "diem": "0.00" } }
+  "object": "list",
+  "data": [
+    {
+      "id": "uuid",
+      "apiKeyType": "INFERENCE",
+      "description": "backend prod",
+      "createdAt": "2025-10-01T12:00:00Z",
+      "expiresAt": null,
+      "lastUsedAt": "2026-04-20T10:05:00Z",
+      "last6Chars": "2V2jNW",
+      "consumptionLimits": { "usd": 50, "diem": 10 },
+      "usage": { "trailingSevenDays": { "usd": "4.20", "diem": "0.00" } }
+    }
+  ]
 }
 ```
 
@@ -76,7 +81,7 @@ Response includes the **one-time** `apiKey` secret:
   "success": true,
   "data": {
     "id": "uuid",
-    "apiKey": "sk-venice-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "apiKey": "VENICE_INFERENCE_KEY_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
     "apiKeyType": "INFERENCE",
     "description": "backend prod",
     "expiresAt": "2026-12-31T23:59:59Z",
@@ -161,7 +166,7 @@ Use it to:
 
 ## `GET /api_keys/rate_limits/log`
 
-Returns the last 50 rate-limit breaches:
+Returns the last 50 rate-limit breaches. Response is wrapped as `{ object: "list", data: [...] }`:
 
 ```json
 {
@@ -247,16 +252,16 @@ if (!data.accessPermitted) alert('Key blocked — top up or change tier')
 
 | Code | Meaning |
 |---|---|
-| `400` | Bad body (e.g. missing `apiKeyType`, malformed `expiresAt`). |
+| `400` | Bad body (e.g. missing `apiKeyType`, malformed `expiresAt`), or attempting to create when you already have 500 active keys. |
 | `401` | Missing / bad / non-admin key for admin-only routes. |
-| `429` | Exceeded 20 creates/min or 500 active keys. |
+| `429` | Exceeded 20 creates/min. |
 | `500` | Transient; retry. |
 
 ## Gotchas
 
 - The secret is returned **exactly once**, in the `POST` response. Losing it = delete + recreate.
 - `consumptionLimit` is per **epoch** (day / reset cycle), not per call.
-- `INFERENCE` keys can't see `/api_keys/*` — only `/api_keys/rate_limits` (their own). Use a separate `ADMIN` key for management.
+- `INFERENCE` keys can't call admin-only routes (`POST/PATCH/DELETE /api_keys`, `GET /api_keys`, `GET /api_keys/{id}`, `GET /billing/balance`, `GET /billing/usage`). They **can** call `GET /api_keys/rate_limits` and `/api_keys/rate_limits/log` for themselves. Use a separate `ADMIN` key for management.
 - `vcu` is legacy — use `diem`.
 - `expiresAt` of empty string `""` means "no expiration" in CREATE; on UPDATE it **removes** an existing one.
 - Rate-limit log is capped at 50 entries — pull it frequently if debugging bursts.

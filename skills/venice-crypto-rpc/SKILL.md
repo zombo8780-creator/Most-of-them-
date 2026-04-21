@@ -9,17 +9,18 @@ Venice exposes a **multi-chain JSON-RPC proxy** billed per call. Same request sh
 
 | Endpoint | Auth | Notes |
 |---|---|---|
-| `GET /crypto/rpc/networks` | Public | Sorted list of supported network slugs. |
+| `GET /crypto/rpc/networks` | Bearer or SIWE | Returns `{ "networks": [...] }` (sorted). |
 | `POST /crypto/rpc/{network}` | Bearer or SIWE (x402) | Forward a JSON-RPC 2.0 request (single or batch). |
 
 ## Supported networks
 
-Call `GET /crypto/rpc/networks` for the current list; as of today it returns 20 slugs:
+Call `GET /crypto/rpc/networks` for the current list. It currently returns 23 slugs (always verify — the catalog grows):
 
 ```
 arbitrum-mainnet    arbitrum-sepolia
 avalanche-mainnet   avalanche-fuji
 base-mainnet        base-sepolia
+blast-mainnet       blast-sepolia
 bsc-mainnet         bsc-testnet
 ethereum-mainnet    ethereum-sepolia    ethereum-holesky
 linea-mainnet       linea-sepolia
@@ -104,7 +105,7 @@ Response headers on `200`:
 |---|---|
 | `X-Venice-RPC-Credits` | Total credits charged (sum over batch). |
 | `X-Venice-RPC-Cost-USD` | Dollar cost to 8 decimal places. |
-| `X-Balance-Remaining` | Remaining x402 USD (x402 auth only). |
+| `X-Balance-Remaining` | Remaining x402 USD — set on routes whose middleware refreshes balance headers. The `/crypto/rpc/*` handler currently emits credits/cost/request headers; treat `X-Balance-Remaining` here as best-effort (may be absent on RPC). Use `GET /x402/balance/{walletAddress}` for an authoritative read. |
 | `X-Request-ID` | 32-char correlation ID — include in support tickets. |
 | `Idempotent-Replayed` | `"true"` when served from the idempotency cache. |
 

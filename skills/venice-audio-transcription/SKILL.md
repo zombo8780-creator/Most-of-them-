@@ -89,19 +89,18 @@ ffmpeg -i long.mp3 -f segment -segment_time 600 -c copy chunk_%03d.mp3
 
 | Code | Meaning |
 |---|---|
-| `400` | Bad params, unsupported audio format, empty file. |
+| `400` | Bad params, unsupported audio format, empty file, or **file larger than 25 MB** (this endpoint returns `400` with `"Maximum size is 25MB"`, not `413`). |
 | `401` | Auth / Pro-only. |
 | `402` | Insufficient balance. |
-| `413` | File too large. Split and retry. |
 | `415` | Wrong `Content-Type` — must be `multipart/form-data`. |
-| `422` | Content policy violation on detected text. |
+| `422` | Validation / upstream ASR error (e.g. zero-length audio, upstream provider 422). Not a "content policy" code on this path. |
 | `429` | Rate limited. |
 | `500` / `503` | Transient; retry with jitter. |
 
 ## Gotchas
 
 - `file` must be uploaded as a real multipart file part. JSON + base64 is **not** supported here.
-- `timestamps: true` + `response_format: text` is a mismatch — Venice emits JSON regardless when timestamps are requested; set `response_format: json` explicitly.
+- Timestamps are only surfaced in the JSON response shapes (`json`, `verbose_json`, `srt`, `vtt`). With `response_format: text` the handler returns a plain `text/plain` body containing just the transcript — you'll lose any timestamp data, so pick `verbose_json` / `srt` / `vtt` when you need timings.
 - `language` is Whisper-specific. Parakeet / Scribe ignore it and auto-detect.
 - Peak concurrency limits apply — on `429`, back off; big batches should throttle to ~5 parallel requests.
-- Content classifiers run on the **transcript**. A profane or policy-violating source audio can trip `422` during transcription.
+- Content-policy rejection on the transcript is returned as `422` with an error string; it does not surface `suggested_prompt` on this path.

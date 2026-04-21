@@ -19,7 +19,7 @@ The default shape for 4xx/5xx. Emitted when there's nothing structured to surfac
 
 ### 2. `DetailedError` — Zod validation failure
 
-Used for `400` on malformed request bodies. `details` is the raw Zod `_errors` tree and tells you which field failed.
+Used for some `400` responses on malformed request bodies. When present, `details` is a Zod `format()` tree (`_errors` recursively keyed by field) alongside a flat `issues` array. Many `400`s are plain `StandardError` without `details` — always handle both.
 
 ```json
 {
@@ -27,15 +27,18 @@ Used for `400` on malformed request bodies. `details` is the raw Zod `_errors` t
   "details": {
     "_errors": [],
     "messages": { "_errors": ["Field is required"] }
-  }
+  },
+  "issues": [
+    { "code": "invalid_type", "path": ["messages"], "message": "Field is required" }
+  ]
 }
 ```
 
-Render `details` to the user so they can fix the input; don't retry — the request shape is wrong.
+Render `details` / `issues` to the user so they can fix the input; don't retry — the request shape is wrong.
 
-### 3. `ContentViolationError` — 422 on image/audio/video prompts
+### 3. `ContentViolationError` — 422 content policy
 
-Returned by image/audio/video generation endpoints when the prompt trips content policy. May include a model-provided safe alternative.
+Returned when a prompt trips content policy. `suggested_prompt` (a model-provided safe alternative) is currently emitted by the **audio** generation pipeline (`/audio/queue`, `/audio/retrieve`); image and video endpoints return `{ error: "Content policy violation" }` without `suggested_prompt`.
 
 ```json
 {
@@ -44,7 +47,7 @@ Returned by image/audio/video generation endpoints when the prompt trips content
 }
 ```
 
-**Pattern** — retry once with `prompt = suggested_prompt` if the user consents.
+**Pattern** — when `suggested_prompt` is present, retry once with `prompt = suggested_prompt` if the user consents.
 
 ### 4. `X402InferencePaymentRequired` — 402 on x402 inference calls
 
@@ -73,7 +76,7 @@ Returned only when the caller authenticated with **SIWE** and has insufficient c
 }
 ```
 
-The same information is base64-JSON encoded in the `PAYMENT-REQUIRED` response header (x402 v2 spec). See [`venice-x402`](../venice-x402/SKILL.md).
+The `PAYMENT-REQUIRED` response header carries a base64-encoded x402 v2 `paymentRequired` **object** (`x402Version`, `error`, `resource`, `accepts[]`, optional `extensions`) — it is **not** the same JSON as the body. Protocol-level clients parse the header; human-facing clients parse the richer body. See [`venice-x402`](../venice-x402/SKILL.md).
 
 ## Status code map
 
@@ -81,10 +84,10 @@ The same information is base64-JSON encoded in the `PAYMENT-REQUIRED` response h
 |---|---|---|---|
 | `400 Bad Request` | `DetailedError` | Malformed input. Zod `details` identifies the field. | Fix and re-send. **Don't retry.** |
 | `401 Unauthorized` | `StandardError` | Missing / invalid Bearer API key or SIWE. | Rotate credentials. **Don't retry.** |
-| `402 Payment Required` | Bearer: `StandardError` (`INSUFFICIENT_BALANCE`). SIWE: `X402InferencePaymentRequired` + `PAYMENT-REQUIRED` header. | Out of DIEM/USD/wallet credit. | Bearer: top up at venice.ai. SIWE: run the x402 top-up flow. |
+| `402 Payment Required` | Bearer: `StandardError` with the configured message (e.g. `{ "error": "Insufficient balance" }` — the handler's default path does not attach a `code` field). SIWE: `X402InferencePaymentRequired` + `PAYMENT-REQUIRED` header. | Out of DIEM/USD/wallet credit. | Bearer: top up at venice.ai. SIWE: run the x402 top-up flow. |
 | `403 Forbidden` | `StandardError` | Valid auth but not entitled. Typical: trial-limited endpoint, beta model, API-key consumption cap hit, SIWE signer ≠ path wallet. | **Don't retry.** Investigate entitlements. |
 | `415 Unsupported Media Type` | `StandardError` | Wrong `Content-Type` (e.g. JSON sent to a multipart endpoint, or vice versa). | Fix headers. **Don't retry.** |
-| `422 Unprocessable Entity` | `ContentViolationError` (image/audio/video). | Content policy violation. | Optionally retry once with `suggested_prompt`. |
+| `422 Unprocessable Entity` | `ContentViolationError` on image/audio/video generation; plain `{ error }` on other routes (e.g. ASR validation errors). | Content policy violation on generation paths; schema-ish validation on others. | On audio generation, optionally retry once with `suggested_prompt`. On others, fix input. |
 | `429 Too Many Requests` | `StandardError` | Rate limit cap tripped. Also returned by `/crypto/rpc/{network}` when credit-per-day or concurrency cap tripped. | Honor `X-RateLimit-*` headers, back off with jitter. |
 | `500 Internal Server Error` | `StandardError` | Unexpected failure. | Retry with exponential backoff + idempotency key where supported. |
 | `503 Service Unavailable` | `StandardError` | Upstream model / service temporarily down. | Retry with backoff. Consider a fallback model. |
@@ -92,13 +95,15 @@ The same information is base64-JSON encoded in the `PAYMENT-REQUIRED` response h
 
 ## Rate-limit headers (`429`)
 
-Emitted on `/crypto/rpc/{network}` and other high-QPS endpoints:
+Emitted on `/crypto/rpc/{network}`:
 
 | Header | Meaning |
 |---|---|
 | `X-RateLimit-Limit` | Per-minute request cap for your tier (paid = 100, staff = 1000 on crypto RPC). |
 | `X-RateLimit-Remaining` | Requests remaining in the current 60-second window. |
-| `X-RateLimit-Reset` | Unix timestamp (seconds) when the window resets. |
+| `X-RateLimit-Reset` | Unix timestamp in **seconds** when the window resets. |
+
+Additionally, `LlmInferenceError` model-overloaded conditions set a `Retry-After` header (seconds) on the 429 — honor it when present.
 
 Inference endpoints (chat, image, audio, video) use a per-API-key tier defined via `/api_keys/rate_limits`. See [`venice-api-keys`](../venice-api-keys/SKILL.md) to pre-fetch your caps, and [`venice-billing`](../venice-billing/SKILL.md) for DIEM/USD usage.
 
@@ -106,7 +111,7 @@ Inference endpoints (chat, image, audio, video) use a per-API-key tier defined v
 
 | Header | Notes |
 |---|---|
-| `PAYMENT-REQUIRED` | Base64-JSON of the x402 v2 `accepts[]` list. Protocol-level discovery — parse even if you don't parse the JSON body. |
+| `PAYMENT-REQUIRED` | Base64-encoded JSON of the x402 v2 `paymentRequired` object (`x402Version`, `error`, `resource`, `accepts[]`, optional `extensions['sign-in-with-x']`). Protocol-level discovery — parse even if you don't parse the JSON body. |
 
 ## Retry strategy
 
@@ -151,14 +156,19 @@ async function callVenice<T>(fn: () => Promise<Response>): Promise<T> {
       continue
     }
 
-    if (status === 422 && body.suggested_prompt) {
+    if (status === 422) {
       throw Object.assign(new Error('Content policy'), { status, body })
     }
 
     if (status === 429) {
-      const reset = Number(res.headers.get('x-ratelimit-reset')) * 1000
-      const wait = Math.max(reset - Date.now(), delay) + Math.random() * 250
-      await sleep(wait)
+      const retryAfterSec = Number(res.headers.get('retry-after'))
+      const resetSec = Number(res.headers.get('x-ratelimit-reset'))
+      const waitMs = !Number.isNaN(retryAfterSec) && retryAfterSec > 0
+        ? retryAfterSec * 1000
+        : !Number.isNaN(resetSec) && resetSec > 0
+          ? Math.max(resetSec * 1000 - Date.now(), delay)
+          : delay
+      await sleep(waitMs + Math.random() * 250)
       delay *= 2
       continue
     }
@@ -187,7 +197,7 @@ Treat them as terminal — the underlying connection is closed. The HTTP status 
 
 ## Request-ID correlation
 
-Keep the `X-Request-ID` header from every response (always present on `/crypto/rpc/*`, typically on others). Include it in support tickets — Venice keys diagnostic logs by this ID.
+When present on a response, keep the `X-Request-ID` header. Include it in support tickets — Venice keys diagnostic logs by this ID. `/crypto/rpc/*` routes set it explicitly; many inference routes also include it, but don't assume it's universal — fall back to your own client-side correlation ID.
 
 ## Common gotchas
 

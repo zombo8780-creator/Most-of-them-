@@ -51,9 +51,9 @@ curl https://api.venice.ai/api/v1/image/generate \
 | Field | Type | Default | Notes |
 |---|---|---|---|
 | `model` | string | — | **Required.** Image model ID. `GET /models?type=image`. |
-| `prompt` | string | — | **Required.** Max `promptCharacterLimit` from the model's `modelSpec.constraints` (typically 1500–7500). |
+| `prompt` | string | — | **Required.** Max `promptCharacterLimit` from the model's `model_spec.constraints` (typically 1500–7500). |
 | `negative_prompt` | string | — | Describe what *not* to show. Same character cap as prompt. |
-| `width`, `height` | int | 1024, 1024 | ≤ 1280 each. Must be divisible by `constraints.widthHeightDivisor` on the model's `modelSpec`. |
+| `width`, `height` | int | 1024, 1024 | ≤ 1280 each. Must be divisible by `constraints.widthHeightDivisor` on the model's `model_spec`. |
 | `aspect_ratio` | string | — | `"1:1"`, `"16:9"`, `"9:16"`, … — used by models like Nano Banana instead of width/height. |
 | `resolution` | string | — | `"1K"`, `"2K"`, `"4K"` — used by resolution-driven models. |
 | `cfg_scale` | number | model default | 0 < x ≤ 20. Higher = more prompt adherence. |
@@ -136,7 +136,7 @@ curl "https://api.venice.ai/api/v1/models?type=image" \
   -H "Authorization: Bearer $VENICE_API_KEY"
 ```
 
-Inspect per-model `modelSpec`:
+Inspect per-model `model_spec`:
 
 - `constraints.widthHeightDivisor` — `width` and `height` must both be divisible by this.
 - `constraints.aspectRatios[]` + `defaultAspectRatio` — if present, the model supports aspect-ratio-driven sizing.
@@ -152,14 +152,16 @@ Pick a model that matches the **feature + size combo** you plan to use.
 ### Fixed-seed A/B test
 
 ```json
-{"model": "flux-dev", "prompt": "...", "seed": 42, "variants": 4}
+{"model": "z-image-turbo", "prompt": "...", "seed": 42, "variants": 4}
 ```
 
 ### Aspect-ratio-driven model (Nano Banana family)
 
 ```json
-{"model": "nano-banana", "prompt": "...", "aspect_ratio": "16:9", "resolution": "2K"}
+{"model": "nano-banana-2", "prompt": "...", "aspect_ratio": "16:9", "resolution": "2K"}
 ```
+
+(Other nano-banana variants: `nano-banana-pro`. Always verify the current ID via `GET /models?type=image`.)
 
 ### Style preset + negative
 
@@ -191,11 +193,12 @@ await fs.writeFile('out.webp', buf)
 |---|---|
 | `400` | Bad params (e.g. dimensions not divisible by `widthHeightDivisor`, prompt too long, `variants>1` with `return_binary`). |
 | `401` | Auth or Pro-only model. |
-| `402` | Insufficient balance. Bearer `INSUFFICIENT_BALANCE`; x402 `PAYMENT_REQUIRED`. |
-| `413` | Payload too large. |
-| `422` | Content policy violation. Check `suggested_prompt` in the body. |
+| `402` | Insufficient balance. Bearer: plain `{ "error": "Insufficient balance" }`; x402: `PAYMENT_REQUIRED` body + `PAYMENT-REQUIRED` header. |
+| `415` | Wrong `Content-Type` (send `application/json` for this endpoint). |
 | `429` | Rate limited. |
 | `500` / `503` | Inference or capacity issue — retry with jitter. |
+
+(Content-policy violations on `/image/generate` come back as `400` with an error string, not `422` — the `422` shape is specific to audio generation paths.)
 
 ## Gotchas
 
